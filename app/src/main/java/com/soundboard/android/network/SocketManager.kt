@@ -68,7 +68,7 @@ class SocketManager @Inject constructor() {
     private val _connectionHealth = MutableStateFlow<ConnectionHealth?>(null)
     val connectionHealth: StateFlow<ConnectionHealth?> = _connectionHealth.asStateFlow()
     
-    // Reconnection management
+    // Enhanced reconnection management for Phase 1
     private var reconnectionAttempts = 0
     private var maxReconnectionAttempts = 10
     private var baseReconnectionDelay = 1000L // 1 second
@@ -76,6 +76,23 @@ class SocketManager @Inject constructor() {
     private var reconnectionJob: Job? = null
     private var healthCheckJob: Job? = null
     private var isManualDisconnect = false
+    
+    // Phase 1: Smart reconnection strategy
+    private var currentReconnectionStrategy = ReconnectionStrategy.EXPONENTIAL_BACKOFF
+    private var disconnectionCause: String? = null
+    private var lastConnectionQuality = ConnectionQuality.UNKNOWN
+    
+    enum class ReconnectionStrategy {
+        IMMEDIATE_RETRY,
+        EXPONENTIAL_BACKOFF,
+        LINEAR_BACKOFF,
+        ADAPTIVE_TIMING,
+        TRANSPORT_SWITCH
+    }
+    
+    enum class ConnectionQuality {
+        EXCELLENT, GOOD, FAIR, POOR, UNKNOWN
+    }
     
     // Transport error management
     private var transportErrorCount = 0
@@ -370,6 +387,62 @@ class SocketManager @Inject constructor() {
                         }
                     } catch (e: Exception) {
                         Log.d(TAG, "Simple pong received")
+                    }
+                }
+            }
+            
+            // Phase 1: Enhanced server communication
+            on("health_prediction") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val data = args[0] as JSONObject
+                        val stability = data.optDouble("stability", 1.0)
+                        val quality = data.optString("quality", "unknown")
+                        
+                        Log.d(TAG, "🔮 Server health prediction: stability=$stability, quality=$quality")
+                        
+                        // Update connection quality based on server prediction
+                        lastConnectionQuality = when (quality) {
+                            "excellent" -> ConnectionQuality.EXCELLENT
+                            "good" -> ConnectionQuality.GOOD
+                            "fair" -> ConnectionQuality.FAIR
+                            "poor" -> ConnectionQuality.POOR
+                            else -> ConnectionQuality.UNKNOWN
+                        }
+                        
+                        // Adjust reconnection strategy based on prediction
+                        adjustReconnectionStrategy(stability, quality)
+                        
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error parsing health prediction: ${e.message}")
+                    }
+                }
+            }
+            
+            on("reconnection_guidance") { args ->
+                if (args.isNotEmpty()) {
+                    try {
+                        val data = args[0] as JSONObject
+                        val strategy = data.optString("strategy", "exponential_backoff")
+                        val estimatedDelay = data.optLong("estimatedDelay", baseReconnectionDelay)
+                        val maxAttempts = data.optInt("maxAttempts", maxReconnectionAttempts)
+                        
+                        Log.d(TAG, "💡 Server reconnection guidance: strategy=$strategy, delay=$estimatedDelay, maxAttempts=$maxAttempts")
+                        
+                        // Apply server recommendations
+                        currentReconnectionStrategy = when (strategy) {
+                            "immediate_retry" -> ReconnectionStrategy.IMMEDIATE_RETRY
+                            "linear_backoff" -> ReconnectionStrategy.LINEAR_BACKOFF
+                            "adaptive_timing" -> ReconnectionStrategy.ADAPTIVE_TIMING
+                            "transport_switch" -> ReconnectionStrategy.TRANSPORT_SWITCH
+                            else -> ReconnectionStrategy.EXPONENTIAL_BACKOFF
+                        }
+                        
+                        baseReconnectionDelay = estimatedDelay
+                        maxReconnectionAttempts = maxAttempts
+                        
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error parsing reconnection guidance: ${e.message}")
                     }
                 }
             }
@@ -831,5 +904,122 @@ class SocketManager @Inject constructor() {
             connectivityManager?.unregisterNetworkCallback(callback)
         }
         disconnect()
+    }
+    
+    // Phase 1: Enhanced Reconnection Strategy Methods
+    private fun adjustReconnectionStrategy(stability: Double, quality: String) {
+        when {
+            stability < 0.3 -> {
+                currentReconnectionStrategy = ReconnectionStrategy.IMMEDIATE_RETRY
+                maxReconnectionAttempts = 3
+                Log.d(TAG, "🚨 Low stability detected - switching to immediate retry strategy")
+            }
+            stability < 0.6 -> {
+                currentReconnectionStrategy = ReconnectionStrategy.EXPONENTIAL_BACKOFF
+                maxReconnectionAttempts = 8
+                Log.d(TAG, "⚠️ Moderate stability - using exponential backoff")
+            }
+            stability < 0.8 -> {
+                currentReconnectionStrategy = ReconnectionStrategy.LINEAR_BACKOFF
+                maxReconnectionAttempts = 6
+                Log.d(TAG, "📊 Fair stability - using linear backoff")
+            }
+            else -> {
+                currentReconnectionStrategy = ReconnectionStrategy.ADAPTIVE_TIMING
+                maxReconnectionAttempts = 10
+                Log.d(TAG, "✅ Good stability - using adaptive timing")
+            }
+        }
+        
+        // Adjust delays based on quality
+        baseReconnectionDelay = when (quality) {
+            "excellent" -> 500L
+            "good" -> 1000L
+            "fair" -> 2000L
+            "poor" -> 5000L
+            else -> 1000L
+        }
+    }
+    
+    private fun calculateIntelligentReconnectionDelay(attempt: Int): Long {
+        return when (currentReconnectionStrategy) {
+            ReconnectionStrategy.IMMEDIATE_RETRY -> {
+                if (attempt <= 3) 100L else baseReconnectionDelay
+            }
+            ReconnectionStrategy.EXPONENTIAL_BACKOFF -> {
+                min(
+                    baseReconnectionDelay * (2.0.pow(attempt - 1)).toLong(),
+                    maxReconnectionDelay
+                )
+            }
+            ReconnectionStrategy.LINEAR_BACKOFF -> {
+                baseReconnectionDelay * attempt
+            }
+            ReconnectionStrategy.ADAPTIVE_TIMING -> {
+                // Adapt based on connection quality and history
+                val qualityMultiplier = when (lastConnectionQuality) {
+                    ConnectionQuality.EXCELLENT -> 0.5
+                    ConnectionQuality.GOOD -> 0.8
+                    ConnectionQuality.FAIR -> 1.2
+                    ConnectionQuality.POOR -> 2.0
+                    ConnectionQuality.UNKNOWN -> 1.0
+                }
+                (baseReconnectionDelay * qualityMultiplier * attempt).toLong()
+            }
+            ReconnectionStrategy.TRANSPORT_SWITCH -> {
+                // Quick retry with potential transport changes
+                baseReconnectionDelay / 2
+            }
+        }
+    }
+    
+    private fun analyzeDisconnectionAndAdjustStrategy(reason: String) {
+        disconnectionCause = reason
+        
+        analytics?.recordDisconnection(reason)
+        
+        when {
+            reason.contains("timeout") -> {
+                currentReconnectionStrategy = ReconnectionStrategy.EXPONENTIAL_BACKOFF
+                baseReconnectionDelay = 2000L
+                Log.d(TAG, "📡 Timeout detected - using longer delays")
+            }
+            reason.contains("transport") -> {
+                currentReconnectionStrategy = ReconnectionStrategy.TRANSPORT_SWITCH
+                baseReconnectionDelay = 1000L
+                Log.d(TAG, "🚀 Transport issue - will try different approach")
+            }
+            reason.contains("server") -> {
+                currentReconnectionStrategy = ReconnectionStrategy.LINEAR_BACKOFF
+                baseReconnectionDelay = 3000L
+                maxReconnectionAttempts = 5
+                Log.d(TAG, "🖥️ Server issue - using conservative approach")
+            }
+            else -> {
+                currentReconnectionStrategy = ReconnectionStrategy.ADAPTIVE_TIMING
+                Log.d(TAG, "🎯 Unknown cause - using adaptive strategy")
+            }
+        }
+    }
+    
+    fun getConnectionQuality(): String {
+        return when (lastConnectionQuality) {
+            ConnectionQuality.EXCELLENT -> "excellent"
+            ConnectionQuality.GOOD -> "good"
+            ConnectionQuality.FAIR -> "fair"
+            ConnectionQuality.POOR -> "poor"
+            ConnectionQuality.UNKNOWN -> "unknown"
+        }
+    }
+    
+    fun getReconnectionStats(): Map<String, Any> {
+        return mapOf(
+            "attempts" to reconnectionAttempts,
+            "maxAttempts" to maxReconnectionAttempts,
+            "strategy" to currentReconnectionStrategy.name,
+            "baseDelay" to baseReconnectionDelay,
+            "lastCause" to (disconnectionCause ?: "unknown"),
+            "quality" to getConnectionQuality()
+        )
     }
 } 

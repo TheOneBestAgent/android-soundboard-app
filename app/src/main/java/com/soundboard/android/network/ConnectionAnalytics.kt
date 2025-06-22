@@ -147,6 +147,9 @@ class ConnectionAnalytics(private val context: Context) {
                 events = eventQueue.toList()
             )
         }
+        
+        // Predictive health analysis for Phase 1 enhancements
+        performPredictiveAnalysis()
     }
     
     fun recordConnectionSuccess(latency: Long? = null, networkType: String? = null) {
@@ -359,4 +362,137 @@ class ConnectionAnalytics(private val context: Context) {
             )
         )
     }
-} 
+    
+    // Phase 1 Enhancement: Predictive Health Analysis
+    private fun performPredictiveAnalysis() {
+        _currentSession.value?.let { session ->
+            val healthPrediction = predictConnectionHealth(session)
+            // Store prediction for future reference
+            recordHealthPrediction(healthPrediction)
+        }
+    }
+    
+    private fun predictConnectionHealth(session: ConnectionSession): ConnectionHealthPrediction {
+        val recentEvents = eventQueue.takeLast(20) // Last 20 events
+        val latencyTrend = calculateLatencyTrend(recentEvents)
+        val errorRate = calculateRecentErrorRate(recentEvents)
+        val stabilityScore = calculateStabilityScore(session)
+        
+        val riskFactors = mutableListOf<String>()
+        
+        // Analyze risk factors
+        if (latencyTrend > 10) riskFactors.add("increasing_latency")
+        if (errorRate > 0.1) riskFactors.add("high_error_rate")
+        if (stabilityScore < 0.8) riskFactors.add("connection_instability")
+        
+        val predictedStability = kotlin.math.max(0.0, kotlin.math.min(1.0, 
+            stabilityScore - (latencyTrend * 0.01) - (errorRate * 0.5)
+        ))
+        
+        return ConnectionHealthPrediction(
+            predictedStability = predictedStability,
+            riskFactors = riskFactors,
+            recommendations = generateHealthRecommendations(riskFactors, latencyTrend, errorRate),
+            confidenceLevel = calculatePredictionConfidence(recentEvents.size)
+        )
+    }
+    
+    private fun calculateLatencyTrend(events: List<ConnectionEvent>): Double {
+        val latencyEvents = events.filter { it.latency != null }.takeLast(10)
+        if (latencyEvents.size < 3) return 0.0
+        
+        val halfPoint = latencyEvents.size / 2
+        val firstHalf = latencyEvents.take(halfPoint).mapNotNull { it.latency }.average()
+        val secondHalf = latencyEvents.drop(halfPoint).mapNotNull { it.latency }.average()
+        
+        return secondHalf - firstHalf
+    }
+    
+    private fun calculateRecentErrorRate(events: List<ConnectionEvent>): Double {
+        if (events.isEmpty()) return 0.0
+        val errorEvents = events.count { 
+            it.eventType in listOf(
+                ConnectionEventType.CONNECT_FAILED,
+                ConnectionEventType.TRANSPORT_ERROR,
+                ConnectionEventType.HEALTH_CHECK_FAILED
+            )
+        }
+        return errorEvents.toDouble() / events.size
+    }
+    
+    private fun calculateStabilityScore(session: ConnectionSession): Double {
+        val totalEvents = session.events.size
+        if (totalEvents == 0) return 1.0
+        
+        val successfulEvents = session.events.count { 
+            it.eventType in listOf(
+                ConnectionEventType.CONNECT_SUCCESS,
+                ConnectionEventType.TRANSPORT_UPGRADE
+            )
+        }
+        val errorEvents = session.events.count { 
+            it.eventType in listOf(
+                ConnectionEventType.CONNECT_FAILED,
+                ConnectionEventType.TRANSPORT_ERROR,
+                ConnectionEventType.HEALTH_CHECK_FAILED
+            )
+        }
+        
+        return (successfulEvents.toDouble() - errorEvents.toDouble()) / totalEvents.toDouble()
+    }
+    
+    private fun generateHealthRecommendations(
+        riskFactors: List<String>, 
+        latencyTrend: Double, 
+        errorRate: Double
+    ): List<String> {
+        val recommendations = mutableListOf<String>()
+        
+        if ("increasing_latency" in riskFactors) {
+            recommendations.add("Latency is increasing. Consider checking USB connection or server performance.")
+        }
+        
+        if ("high_error_rate" in riskFactors) {
+            recommendations.add("High error rate detected. Restart connection or check server status.")
+        }
+        
+        if ("connection_instability" in riskFactors) {
+            recommendations.add("Connection appears unstable. Check USB cable and ADB setup.")
+        }
+        
+        if (latencyTrend > 20) {
+            recommendations.add("Significant latency increase detected. Consider reconnecting.")
+        }
+        
+        if (errorRate > 0.2) {
+            recommendations.add("Critical error rate. Immediate reconnection recommended.")
+        }
+        
+        return recommendations
+    }
+    
+    private fun calculatePredictionConfidence(eventCount: Int): Double {
+        return when {
+            eventCount >= 20 -> 0.9
+            eventCount >= 10 -> 0.7
+            eventCount >= 5 -> 0.5
+            else -> 0.3
+        }
+    }
+    
+    private fun recordHealthPrediction(prediction: ConnectionHealthPrediction) {
+        // Store prediction in current session or log for future analysis
+        recordEvent(
+            eventType = ConnectionEventType.HEALTH_CHECK_FAILED, // Reuse existing type or add new one
+            details = "Health prediction: stability=${prediction.predictedStability}, risks=${prediction.riskFactors.joinToString()}"
+        )
+    }
+}
+
+@Serializable
+data class ConnectionHealthPrediction(
+    val predictedStability: Double,
+    val riskFactors: List<String>,
+    val recommendations: List<String>,
+    val confidenceLevel: Double
+) 

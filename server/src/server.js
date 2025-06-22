@@ -7,6 +7,8 @@ const fs = require('fs-extra');
 const AudioPlayer = require('./audio/AudioPlayer');
 const VoicemeeterManager = require('./audio/VoicemeeterManager');
 const AdbManager = require('./network/AdbManager');
+const ConnectionHealthMonitor = require('./network/ConnectionHealthMonitor');
+const SmartReconnectionManager = require('./network/SmartReconnectionManager');
 const { Server } = require('socket.io');
 
 class SoundboardServer {
@@ -51,7 +53,11 @@ class SoundboardServer {
         this.connectedClients = new Map();
         this.audioFiles = new Map(); // Store audio file metadata
         
-        // Connection monitoring and health check system
+        // Enhanced connection monitoring system
+        this.healthMonitor = new ConnectionHealthMonitor();
+        this.reconnectionManager = new SmartReconnectionManager();
+        
+        // Legacy connection monitoring (for backward compatibility)
         this.startTime = Date.now();
         this.connectionStats = {
             totalConnections: 0,
@@ -60,10 +66,89 @@ class SoundboardServer {
             startTime: this.startTime
         };
         
+        // Setup enhanced monitoring event handlers
+        this.setupEnhancedMonitoring();
+        
         this.setupMiddleware();
         this.setupRoutes();
         this.setupSocketHandlers();
         this.setupAudioDirectory();
+    }
+    
+    setupEnhancedMonitoring() {
+        // Enhanced health monitoring event handlers
+        this.healthMonitor.on('healthPrediction', (prediction) => {
+            console.log(`🔮 Health prediction for ${prediction.socketId}:`, {
+                avgLatency: prediction.avgLatency,
+                stability: prediction.predictedStability,
+                riskFactors: prediction.riskFactors,
+                recommendations: prediction.recommendations.length
+            });
+            
+            // Send health prediction to client if needed
+            this.io.to(prediction.socketId).emit('health_prediction', {
+                stability: prediction.predictedStability,
+                quality: prediction.avgLatency < 50 ? 'excellent' : 
+                        prediction.avgLatency < 100 ? 'good' : 
+                        prediction.avgLatency < 200 ? 'fair' : 'poor',
+                recommendations: prediction.recommendations
+            });
+        });
+        
+        this.healthMonitor.on('connectionError', (errorData) => {
+            console.log(`⚠️  Connection error detected for ${errorData.socketId}:`, errorData.error);
+            
+            // Analyze and potentially trigger reconnection strategy
+            const connectionHistory = this.getConnectionHistory(errorData.socketId);
+            const analysis = this.reconnectionManager.analyzeDisconnectionCause(
+                errorData.socketId, 
+                errorData.error.type, 
+                connectionHistory
+            );
+            
+            console.log(`🧠 Reconnection analysis:`, analysis);
+        });
+        
+        this.reconnectionManager.on('reconnectionRecommendation', (recommendation) => {
+            console.log(`💡 Reconnection recommendation for ${recommendation.socketId}:`, recommendation);
+            
+            // Send reconnection guidance to client
+            this.io.to(recommendation.socketId).emit('reconnection_guidance', {
+                strategy: recommendation.strategy,
+                estimatedDelay: recommendation.estimatedDelay,
+                maxAttempts: recommendation.maxAttempts,
+                tips: recommendation.tips
+            });
+        });
+        
+        console.log('🔧 Enhanced connection monitoring initialized');
+    }
+    
+    getConnectionHistory(socketId) {
+        const connection = this.healthMonitor.connections.get(socketId);
+        if (!connection) {
+            return {
+                recentFailures: 0,
+                longestConnection: 0,
+                networkType: 'unknown',
+                serverRestarts: 0
+            };
+        }
+        
+        const now = Date.now();
+        const connectionDuration = now - connection.startTime;
+        const recentErrors = connection.errors.filter(e => now - e.timestamp < 300000); // Last 5 minutes
+        
+        return {
+            recentFailures: recentErrors.length,
+            longestConnection: connectionDuration,
+            networkType: connection.clientInfo.platform === 'android' ? 'mobile' : 'wifi',
+            serverRestarts: 0, // Could be tracked separately
+            transportUpgrades: connection.transportUpgrades,
+            avgLatency: connection.pingHistory.length > 0 ? 
+                connection.pingHistory.reduce((sum, p) => sum + p.latency, 0) / connection.pingHistory.length : 0,
+            errorRate: recentErrors.length / Math.max(1, connection.pingHistory.length)
+        };
     }
     
     setupMiddleware() {
@@ -118,7 +203,10 @@ class SoundboardServer {
                     play_audio_data: '/play-audio-data',
                     voicemeeter_status: '/voicemeeter/status',
                     voicemeeter_control: '/voicemeeter/control',
-                    voicemeeter_volume_recommendations: '/voicemeeter/volume-recommendations'
+                    voicemeeter_volume_recommendations: '/voicemeeter/volume-recommendations',
+                    connection_analytics: '/analytics/connections',
+                    global_analytics: '/analytics/global',
+                    reconnection_stats: '/analytics/reconnection'
                 }
             });
         });
@@ -364,6 +452,32 @@ class SoundboardServer {
                 });
             }
         });
+
+        // Enhanced Analytics Endpoints
+        this.app.get('/analytics/connections', (req, res) => {
+            const socketId = req.query.socketId;
+            if (socketId) {
+                const analytics = this.healthMonitor.getConnectionAnalytics(socketId);
+                res.json(analytics || { error: 'Connection not found' });
+            } else {
+                // Return all active connections analytics
+                const allAnalytics = {};
+                for (const [id] of this.healthMonitor.connections) {
+                    allAnalytics[id] = this.healthMonitor.getConnectionAnalytics(id);
+                }
+                res.json(allAnalytics);
+            }
+        });
+
+        this.app.get('/analytics/global', (req, res) => {
+            const globalAnalytics = this.healthMonitor.getGlobalAnalytics();
+            res.json(globalAnalytics);
+        });
+
+        this.app.get('/analytics/reconnection', (req, res) => {
+            const reconnectionStats = this.reconnectionManager.getGlobalStats();
+            res.json(reconnectionStats);
+        });
     }
     
     setupSocketHandlers() {
@@ -373,14 +487,21 @@ class SoundboardServer {
             console.log(`   🚀 Transport: ${socket.conn.transport.name}`);
             console.log(`   📍 Address: ${socket.handshake.address}`);
             
-            // Update connection statistics
-            this.connectionStats.totalConnections++;
+            // Enhanced connection tracking
             const clientInfo = {
                 id: socket.id,
                 connectedAt: new Date().toISOString(),
                 transport: socket.conn.transport.name,
-                address: socket.handshake.address
+                address: socket.handshake.address,
+                userAgent: socket.handshake.headers['user-agent'],
+                platform: socket.handshake.query.platform || 'unknown'
             };
+            
+            // Track with health monitor
+            this.healthMonitor.trackConnection(socket.id, clientInfo);
+            
+            // Update legacy connection statistics for backward compatibility
+            this.connectionStats.totalConnections++;
             this.connectionStats.activeConnections.set(socket.id, clientInfo);
             
             // Log initial transport and let Socket.io handle upgrades automatically
@@ -392,11 +513,20 @@ class SoundboardServer {
             // Handle transport upgrades
             socket.conn.on('upgrade', () => {
                 console.log(`🚀 Transport upgraded to: ${socket.conn.transport.name} for ${socket.id}`);
+                
+                // Update legacy stats
                 const client = this.connectionStats.activeConnections.get(socket.id);
                 if (client) {
                     client.transport = socket.conn.transport.name;
                     this.connectionStats.activeConnections.set(socket.id, client);
                 }
+                
+                // Track with health monitor
+                this.healthMonitor.recordTransportUpgrade(
+                    socket.id, 
+                    'polling', 
+                    socket.conn.transport.name
+                );
             });
             
             // Log active connections based on transport type
@@ -406,12 +536,20 @@ class SoundboardServer {
                 console.log(`🔗 Active connections: ${this.connectionStats.activeConnections.size}`);
             }
             
-            // WebSocket ping/pong handling
+            // Enhanced WebSocket ping/pong handling with latency tracking
             socket.on('ping', (data) => {
-                console.log(`🏓 ${socket.conn.transport.name === 'websocket' ? 'WebSocket' : 'Polling'} ping from ${socket.id}`);
+                const pingTime = data && data.timestamp ? data.timestamp : Date.now();
+                const latency = Date.now() - pingTime;
+                
+                console.log(`🏓 ${socket.conn.transport.name === 'websocket' ? 'WebSocket' : 'Polling'} ping from ${socket.id} (${latency}ms)`);
+                
+                // Record latency with health monitor
+                this.healthMonitor.recordLatency(socket.id, latency);
+                
                 socket.emit('pong', { 
                     timestamp: Date.now(),
-                    serverUptime: Date.now() - this.startTime
+                    serverUptime: Date.now() - this.startTime,
+                    latency: latency
                 });
             });
             
@@ -431,16 +569,34 @@ class SoundboardServer {
                 }
             });
             
-            // Connection disconnection handling
+            // Enhanced disconnection handling with analysis
             socket.on('disconnect', (reason) => {
                 console.log(`❌ ${socket.conn.transport.name === 'websocket' ? 'WebSocket' : 'Client'} disconnected: ${socket.id}, reason: ${reason}`);
+                
+                // End health monitoring for this connection
+                this.healthMonitor.endConnection(socket.id, reason);
+                
+                // Analyze disconnection for future reconnection strategies
+                const connectionHistory = this.getConnectionHistory(socket.id);
+                const analysis = this.reconnectionManager.analyzeDisconnectionCause(
+                    socket.id, 
+                    reason, 
+                    connectionHistory
+                );
+                
+                console.log(`🧠 Disconnection analysis: ${analysis.cause} (${analysis.severity} severity, ${analysis.recoverability} recoverability)`);
+                
+                // Update legacy stats
                 this.connectionStats.activeConnections.delete(socket.id);
                 console.log(`🔗 Active ${socket.conn.transport.name === 'websocket' ? 'WebSocket ' : ''}connections: ${socket.conn.transport.name === 'websocket' ? Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length : this.connectionStats.activeConnections.size}`);
             });
             
-            // Error handling
+            // Enhanced error handling with detailed tracking
             socket.on('error', (error) => {
                 console.error(`❌ ${socket.conn.transport.name === 'websocket' ? 'WebSocket' : 'Socket'} error for ${socket.id}:`, error);
+                
+                // Record error with health monitor
+                this.healthMonitor.recordError(socket.id, 'socket_error', error.message || error.toString());
             });
 
             // Send initial connection confirmation
