@@ -1,0 +1,71 @@
+com.soundboard.android.app-room-ktx-2.6.0-0 /Users/Darius/.gradle/caches/8.14.2/transforms/00b558bd2aa788eab22c564d1dbb61cd/transformed/room-ktx-2.6.0/res
+com.soundboard.android.app-coil-base-2.5.0-1 /Users/Darius/.gradle/caches/8.14.2/transforms/01670f24bbb7f0c019b46bb53bd1c483/transformed/coil-base-2.5.0/res
+com.soundboard.android.app-lifecycle-process-2.7.0-2 /Users/Darius/.gradle/caches/8.14.2/transforms/034bcfda3a8835abed6b44dd1fe49ec6/transformed/lifecycle-process-2.7.0/res
+com.soundboard.android.app-play-services-auth-20.7.0-3 /Users/Darius/.gradle/caches/8.14.2/transforms/0659790b3f65b61c0d6617ad63a0c34c/transformed/play-services-auth-20.7.0/res
+com.soundboard.android.app-navigation-compose-2.7.4-4 /Users/Darius/.gradle/caches/8.14.2/transforms/0b453ea1bc7f3eea48131b91d20287f8/transformed/navigation-compose-2.7.4/res
+com.soundboard.android.app-savedstate-ktx-1.2.1-5 /Users/Darius/.gradle/caches/8.14.2/transforms/0dc2cb81b9c052256206ffbe65409549/transformed/savedstate-ktx-1.2.1/res
+com.soundboard.android.app-lifecycle-runtime-ktx-2.7.0-6 /Users/Darius/.gradle/caches/8.14.2/transforms/111dca1e6dd867d867fc0bfe6f593cb0/transformed/lifecycle-runtime-ktx-2.7.0/res
+com.soundboard.android.app-activity-ktx-1.8.0-7 /Users/Darius/.gradle/caches/8.14.2/transforms/1422ededa17429045911d8e645a68a8c/transformed/activity-ktx-1.8.0/res
+com.soundboard.android.app-room-runtime-2.6.0-8 /Users/Darius/.gradle/caches/8.14.2/transforms/1776592d96a31b8f40b259dc85f932cd/transformed/room-runtime-2.6.0/res
+com.soundboard.android.app-lifecycle-livedata-core-ktx-2.7.0-9 /Users/Darius/.gradle/caches/8.14.2/transforms/1a1b19dacecc6a529f049b86e6892375/transformed/lifecycle-livedata-core-ktx-2.7.0/res
+com.soundboard.android.app-lifecycle-viewmodel-ktx-2.7.0-10 /Users/Darius/.gradle/caches/8.14.2/transforms/2694935c626f070317e763b1f1c34796/transformed/lifecycle-viewmodel-ktx-2.7.0/res
+com.soundboard.android.app-ui-unit-release-11 /Users/Darius/.gradle/caches/8.14.2/transforms/2ae58d37d2f1df0b26ebf86c0ea4974c/transformed/ui-unit-release/res
+com.soundboard.android.app-core-1.12.0-12 /Users/Darius/.gradle/caches/8.14.2/transforms/2e13929c241b1b4957dcdea93b38ba0e/transformed/core-1.12.0/res
+com.soundboard.android.app-material-icons-core-release-13 /Users/Darius/.gradle/caches/8.14.2/transforms/30fd9105938bcfe5e354ffa32c025de3/transformed/material-icons-core-release/res
+com.soundboard.android.app-annotation-experimental-1.3.0-14 /Users/Darius/.gradle/caches/8.14.2/transforms/3af5047fa6e31feb7ab9f0682745b468/transformed/annotation-experimental-1.3.0/res
+com.soundboard.android.app-ui-graphics-release-15 /Users/Darius/.gradle/caches/8.14.2/transforms/401f4909870d9259ce84309f59bfe424/transformed/ui-graphics-release/res
+com.soundboard.android.app-lifecycle-livedata-core-2.7.0-16 /Users/Darius/.gradle/caches/8.14.2/transforms/479c7b2b33e92a693bd9584bb9380bdf/transformed/lifecycle-livedata-core-2.7.0/res
+com.soundboard.android.app-ui-tooling-preview-release-17 /Users/Darius/.gradle/caches/8.14.2/transforms/505e769bb2f08e974d3bcf076620b447/transformed/ui-tooling-preview-release/res
+com.soundboard.android.app-play-services-base-18.0.1-18 /Users/Darius/.gradle/caches/8.14.2/transforms/50f53200f77d5614a642ae35b8c56585/transformed/play-services-base-18.0.1/res
+com.soundboard.android.app-navigation-common-2.7.4-19 /Users/Darius/.gradle/caches/8.14.2/transforms/5232dfed606992d9616cf2a00b1b0dbb/transformed/navigation-common-2.7.4/res
+com.soundboard.android.app-animation-core-release-20 /Users/Darius/.gradle/caches/8.14.2/transforms/550caa5f2e58bf5c970659aff38937b6/transformed/animation-core-release/res
+com.soundboard.android.app-appcompat-resources-1.6.1-21 /Users/Darius/.gradle/caches/8.14.2/transforms/56b704ce911ad0b46b6dc3fb28a07c19/transformed/appcompat-resources-1.6.1/res
+com.soundboard.android.app-media3-ui-1.1.1-22 /Users/Darius/.gradle/caches/8.14.2/transforms/600335379a28bd851b651d55f2ce0ff0/transformed/media3-ui-1.1.1/res
+com.soundboard.android.app-ui-geometry-release-23 /Users/Darius/.gradle/caches/8.14.2/transforms/60c1364baf79d90004d1cfc971b67925/transformed/ui-geometry-release/res
+com.soundboard.android.app-ui-tooling-data-release-24 /Users/Darius/.gradle/caches/8.14.2/transforms/63e4aa6fbdd49087d2502cc7613c23e3/transformed/ui-tooling-data-release/res
+com.soundboard.android.app-navigation-runtime-ktx-2.7.4-25 /Users/Darius/.gradle/caches/8.14.2/transforms/64386bff7a63268e6b78ee50c05ef775/transformed/navigation-runtime-ktx-2.7.4/res
+com.soundboard.android.app-material-release-26 /Users/Darius/.gradle/caches/8.14.2/transforms/66447b1cca6aeeb5502b7dd4ff1ba4a9/transformed/material-release/res
+com.soundboard.android.app-startup-runtime-1.1.1-27 /Users/Darius/.gradle/caches/8.14.2/transforms/669d03196e25757951c21a2851874846/transformed/startup-runtime-1.1.1/res
+com.soundboard.android.app-navigation-common-ktx-2.7.4-28 /Users/Darius/.gradle/caches/8.14.2/transforms/70911e4535ebb44d9f478e1d7fcad812/transformed/navigation-common-ktx-2.7.4/res
+com.soundboard.android.app-ui-text-release-29 /Users/Darius/.gradle/caches/8.14.2/transforms/72f47a9471798ad1fc6be1cb4ad1acf5/transformed/ui-text-release/res
+com.soundboard.android.app-hilt-navigation-compose-1.1.0-30 /Users/Darius/.gradle/caches/8.14.2/transforms/769b38303b33330fbf5e1239ccd42295/transformed/hilt-navigation-compose-1.1.0/res
+com.soundboard.android.app-animation-release-31 /Users/Darius/.gradle/caches/8.14.2/transforms/76cd69f5eb6af85e017653da7ab00703/transformed/animation-release/res
+com.soundboard.android.app-hilt-navigation-1.1.0-32 /Users/Darius/.gradle/caches/8.14.2/transforms/8bd6e107f3a0994e3c7c68947022a1ab/transformed/hilt-navigation-1.1.0/res
+com.soundboard.android.app-material-ripple-release-33 /Users/Darius/.gradle/caches/8.14.2/transforms/8dad564381a16f1ecc076e88a1bd1079/transformed/material-ripple-release/res
+com.soundboard.android.app-foundation-layout-release-34 /Users/Darius/.gradle/caches/8.14.2/transforms/8db76877473ea5331f444384989924b9/transformed/foundation-layout-release/res
+com.soundboard.android.app-lifecycle-viewmodel-savedstate-2.7.0-35 /Users/Darius/.gradle/caches/8.14.2/transforms/919ed4ef866343121bfad05e6580606f/transformed/lifecycle-viewmodel-savedstate-2.7.0/res
+com.soundboard.android.app-ui-util-release-36 /Users/Darius/.gradle/caches/8.14.2/transforms/922446c605cb4fca888625156f6e9cec/transformed/ui-util-release/res
+com.soundboard.android.app-media-1.6.0-37 /Users/Darius/.gradle/caches/8.14.2/transforms/952b4353d6fbd9d50d1bbe10c2b5876c/transformed/media-1.6.0/res
+com.soundboard.android.app-navigation-runtime-2.7.4-38 /Users/Darius/.gradle/caches/8.14.2/transforms/95f08af929399b776d258e3de8e59639/transformed/navigation-runtime-2.7.4/res
+com.soundboard.android.app-sqlite-2.4.0-39 /Users/Darius/.gradle/caches/8.14.2/transforms/98a27f1e52b46540f173e9b682ce2997/transformed/sqlite-2.4.0/res
+com.soundboard.android.app-ui-test-manifest-1.5.4-40 /Users/Darius/.gradle/caches/8.14.2/transforms/a6dd8cc111f721dfcb48c5c707145bea/transformed/ui-test-manifest-1.5.4/res
+com.soundboard.android.app-activity-compose-1.8.0-41 /Users/Darius/.gradle/caches/8.14.2/transforms/a7931385d75e25280bd9a5a2732072f6/transformed/activity-compose-1.8.0/res
+com.soundboard.android.app-play-services-basement-18.2.0-42 /Users/Darius/.gradle/caches/8.14.2/transforms/a929a84041b1ebf70c1ca8639c0ac6ff/transformed/play-services-basement-18.2.0/res
+com.soundboard.android.app-lifecycle-viewmodel-2.7.0-43 /Users/Darius/.gradle/caches/8.14.2/transforms/ac364610dc3bcd3342a3d11ffcdc48e7/transformed/lifecycle-viewmodel-2.7.0/res
+com.soundboard.android.app-core-runtime-2.2.0-44 /Users/Darius/.gradle/caches/8.14.2/transforms/adc3b20589b5f878c925e12b8bffc317/transformed/core-runtime-2.2.0/res
+com.soundboard.android.app-profileinstaller-1.3.1-45 /Users/Darius/.gradle/caches/8.14.2/transforms/af1ab43a60460a4b5c6ce162dc992b87/transformed/profileinstaller-1.3.1/res
+com.soundboard.android.app-ui-tooling-release-46 /Users/Darius/.gradle/caches/8.14.2/transforms/b12e1c187ec00c7b3b1d6a46f3bed242/transformed/ui-tooling-release/res
+com.soundboard.android.app-activity-1.8.0-47 /Users/Darius/.gradle/caches/8.14.2/transforms/b9716dd7dca56ea0b95bfec3fe1a7a1e/transformed/activity-1.8.0/res
+com.soundboard.android.app-foundation-release-48 /Users/Darius/.gradle/caches/8.14.2/transforms/c025416efca1ee1629f1c476eb4fabe3/transformed/foundation-release/res
+com.soundboard.android.app-sqlite-framework-2.4.0-49 /Users/Darius/.gradle/caches/8.14.2/transforms/c1622c961e7bf020af306e02ef9d65cf/transformed/sqlite-framework-2.4.0/res
+com.soundboard.android.app-customview-poolingcontainer-1.0.0-50 /Users/Darius/.gradle/caches/8.14.2/transforms/c45ea4fdae5b0ee3495cffb939292bc0/transformed/customview-poolingcontainer-1.0.0/res
+com.soundboard.android.app-material-icons-extended-release-51 /Users/Darius/.gradle/caches/8.14.2/transforms/c76e3ee11561d4d9952df7924336cbb9/transformed/material-icons-extended-release/res
+com.soundboard.android.app-core-ktx-1.12.0-52 /Users/Darius/.gradle/caches/8.14.2/transforms/cd59ff47b688120d48bc94bd68f97fa9/transformed/core-ktx-1.12.0/res
+com.soundboard.android.app-lifecycle-runtime-2.7.0-53 /Users/Darius/.gradle/caches/8.14.2/transforms/cea9efd2212756f34a3308e6d22cc3b6/transformed/lifecycle-runtime-2.7.0/res
+com.soundboard.android.app-material3-1.1.2-54 /Users/Darius/.gradle/caches/8.14.2/transforms/d141cde8a2d381d26eac498ab27426f0/transformed/material3-1.1.2/res
+com.soundboard.android.app-media3-exoplayer-1.1.1-55 /Users/Darius/.gradle/caches/8.14.2/transforms/d46a3160ed365e57e75775c1a8e1e470/transformed/media3-exoplayer-1.1.1/res
+com.soundboard.android.app-runtime-saveable-release-56 /Users/Darius/.gradle/caches/8.14.2/transforms/d874675ab43e4faed0b9527683463b41/transformed/runtime-saveable-release/res
+com.soundboard.android.app-fragment-1.5.1-57 /Users/Darius/.gradle/caches/8.14.2/transforms/e122ccc7027d6aecff75b08a17ae32f0/transformed/fragment-1.5.1/res
+com.soundboard.android.app-lifecycle-viewmodel-compose-2.7.0-58 /Users/Darius/.gradle/caches/8.14.2/transforms/e44e39deca2f09f0c8bd8fea4ccfb80e/transformed/lifecycle-viewmodel-compose-2.7.0/res
+com.soundboard.android.app-lifecycle-livedata-2.7.0-59 /Users/Darius/.gradle/caches/8.14.2/transforms/e6c04a2d4ed4711957a0af7d21d1c3b9/transformed/lifecycle-livedata-2.7.0/res
+com.soundboard.android.app-ui-release-60 /Users/Darius/.gradle/caches/8.14.2/transforms/e7ee64946a7f6b5427f9767215097263/transformed/ui-release/res
+com.soundboard.android.app-recyclerview-1.3.0-61 /Users/Darius/.gradle/caches/8.14.2/transforms/e88f86942fffcc6c586c89e68d84e8f7/transformed/recyclerview-1.3.0/res
+com.soundboard.android.app-emoji2-1.4.0-62 /Users/Darius/.gradle/caches/8.14.2/transforms/eaca8e1e1c21e153421fac55d3fd8261/transformed/emoji2-1.4.0/res
+com.soundboard.android.app-runtime-release-63 /Users/Darius/.gradle/caches/8.14.2/transforms/f88dd33bfa1df0ddeb23ec59c709c640/transformed/runtime-release/res
+com.soundboard.android.app-savedstate-1.2.1-64 /Users/Darius/.gradle/caches/8.14.2/transforms/fb8ac2e937b26b15f735d54e23e8fd5e/transformed/savedstate-1.2.1/res
+com.soundboard.android.app-resValues-65 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/generated/res/resValues/debug
+com.soundboard.android.app-packageDebugResources-66 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.soundboard.android.app-packageDebugResources-67 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.soundboard.android.app-debug-68 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.soundboard.android.app-debug-69 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/debug/res
+com.soundboard.android.app-main-70 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/main/res

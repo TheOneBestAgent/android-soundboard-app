@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Android Soundboard</string>
+    <string name="connect_to_server">Connect to Server</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="add_sound_button">Add Sound Button</string>
+    <string name="connection_settings">Connection Settings</string>
+    <string name="ip_address">IP Address</string>
+    <string name="port">Port</string>
+    <string name="connect">Connect</string>
+    <string name="cancel">Cancel</string>
+    <string name="error_connection_failed">Connection failed</string>
+    <string name="error_not_connected">Not connected to server</string>
+    <string name="loading_soundboard">Loading soundboard...</string>
+</resources> 
