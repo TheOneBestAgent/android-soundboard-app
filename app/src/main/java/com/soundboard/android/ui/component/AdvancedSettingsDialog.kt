@@ -542,7 +542,7 @@ private suspend fun importSettings(
             if (settings.has("animations_enabled")) settingsRepository.setAnimationsEnabled(settings.getBoolean("animations_enabled"))
             if (settings.has("show_button_labels")) settingsRepository.setShowButtonLabels(settings.getBoolean("show_button_labels"))
             if (settings.has("sample_rate")) settingsRepository.setSampleRate(settings.getInt("sample_rate"))
-            if (settings.has("buffer_size")) settingsRepository.setBufferSize(settings.getInt("buffer_size"))
+            if (settings.has("buffer_size")) settingsRepository.setBufferSize(settings.getString("buffer_size"))
             if (settings.has("max_concurrent_sounds")) settingsRepository.setMaxConcurrentSounds(settings.getInt("max_concurrent_sounds"))
             if (settings.has("audio_quality")) settingsRepository.setAudioQuality(settings.getDouble("audio_quality").toFloat())
             if (settings.has("auto_reconnect")) settingsRepository.setAutoReconnect(settings.getBoolean("auto_reconnect"))

@@ -68,6 +68,11 @@ class SoundboardRepository @Inject constructor(
     suspend fun deleteSoundButtonById(id: Int) = 
         soundButtonDao.deleteSoundButtonById(id)
     
+    suspend fun deleteAllSoundButtons() = 
+        soundButtonDao.deleteAllSoundButtons()
+    
+
+    
     // Layout operations
     fun getAllLayouts(): Flow<List<SoundboardLayout>> = soundboardLayoutDao.getAllLayouts()
     
@@ -83,6 +88,9 @@ class SoundboardRepository @Inject constructor(
     
     suspend fun deleteLayout(layout: SoundboardLayout) = 
         soundboardLayoutDao.deleteLayout(layout)
+    
+    suspend fun deleteAllLayouts() = 
+        soundboardLayoutDao.deleteAllLayouts()
     
     suspend fun switchActiveLayout(id: Long) = 
         soundboardLayoutDao.switchActiveLayout(id)

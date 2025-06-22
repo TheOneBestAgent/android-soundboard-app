@@ -142,28 +142,124 @@ class AdbManager {
             // Check if reverse forwarding already exists to avoid repeated attempts
             const forwardingKey = `${deviceId || 'default'}:8080:${serverPort}`;
             if (this.forwardedPorts.has(forwardingKey)) {
-                // Already forwarded - return success without logging spam
-                return true;
+                // Verify the forwarding is still active
+                const isActive = await this.verifyPortForwarding(deviceId, 8080);
+                if (isActive) {
+                    return true;
+                }
+                // Remove stale forwarding entry
+                this.forwardedPorts.delete(forwardingKey);
             }
             
-            // Reverse forward: device port 8080 to computer server port (3001 by default)
-            // This means: Android app connects to localhost:8080 → gets forwarded to computer server on port 3001
-            await this.reversePort(8080, serverPort, deviceId);
+            // Enhanced retry logic with exponential backoff
+            let retryCount = 0;
+            const maxRetries = 3;
+            const baseDelay = 1000; // 1 second
             
-            // Track the device-specific forwarding with full key
-            this.forwardedPorts.add(forwardingKey);
-            
-            console.log(`✅ Soundboard reverse port forwarding established: device:8080 → computer:${serverPort}`);
-            return true;
-        } catch (error) {
-            // Don't log "Address already in use" as an error - it means forwarding exists
-            if (error.message.includes('Address already in use')) {
-                const forwardingKey = `${deviceId || 'default'}:8080:${serverPort}`;
-                this.forwardedPorts.add(forwardingKey);
-                return true; // Still successful
+            while (retryCount < maxRetries) {
+                try {
+                    // Reverse forward: device port 8080 to computer server port
+                    await this.reversePort(8080, serverPort, deviceId);
+                    
+                    // Verify the forwarding was successful
+                    const verification = await this.verifyPortForwarding(deviceId, 8080);
+                    if (verification) {
+                        this.forwardedPorts.add(forwardingKey);
+                        console.log(`✅ Soundboard reverse port forwarding established: device:8080 → computer:${serverPort}`);
+                        return true;
+                    }
+                    
+                    throw new Error('Port forwarding verification failed');
+                    
+                } catch (error) {
+                    retryCount++;
+                    
+                    if (error.message.includes('Address already in use')) {
+                        // Port is already forwarded, verify and proceed
+                        const verification = await this.verifyPortForwarding(deviceId, 8080);
+                        if (verification) {
+                            this.forwardedPorts.add(forwardingKey);
+                            return true;
+                        }
+                    }
+                    
+                    if (retryCount < maxRetries) {
+                        const delay = baseDelay * Math.pow(2, retryCount - 1);
+                        console.log(`⚠️  ADB forwarding attempt ${retryCount} failed, retrying in ${delay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        console.error('❌ Failed to setup soundboard reverse forwarding after all retries:', error.message);
+                        return false;
+                    }
+                }
             }
-            console.error('❌ Failed to setup soundboard reverse forwarding:', error.message);
+            
             return false;
+            
+        } catch (error) {
+            console.error('❌ Critical error in setupSoundboardForwarding:', error.message);
+            return false;
+        }
+    }
+
+    async verifyPortForwarding(deviceId = null, port) {
+        try {
+            const deviceArg = deviceId ? `-s ${deviceId}` : '';
+            const command = `${this.adbPath} ${deviceArg} reverse --list`;
+            
+            return new Promise((resolve) => {
+                exec(command, (error, stdout, stderr) => {
+                    if (error) {
+                        resolve(false);
+                        return;
+                    }
+                    
+                    // Check if our port forwarding is listed
+                    const isForwarded = stdout.includes(`tcp:${port}`);
+                    resolve(isForwarded);
+                });
+            });
+        } catch (error) {
+            console.error('Error verifying port forwarding:', error);
+            return false;
+        }
+    }
+
+    async performHealthCheck(deviceId = null) {
+        try {
+            // Check device connectivity
+            const devices = await this.listDevices();
+            const targetDevice = deviceId ? 
+                devices.find(d => d.id === deviceId) : 
+                devices.find(d => d.connected);
+            
+            if (!targetDevice || !targetDevice.connected) {
+                return { healthy: false, reason: 'Device not connected' };
+            }
+            
+            // Check port forwarding
+            const portForwarded = await this.verifyPortForwarding(deviceId, 8080);
+            if (!portForwarded) {
+                return { healthy: false, reason: 'Port forwarding not active' };
+            }
+            
+            // Test basic communication
+            const deviceInfo = await this.getDeviceInfo(deviceId);
+            if (!deviceInfo) {
+                return { healthy: false, reason: 'Cannot communicate with device' };
+            }
+            
+            return { 
+                healthy: true, 
+                deviceInfo: deviceInfo,
+                timestamp: new Date().toISOString()
+            };
+            
+        } catch (error) {
+            return { 
+                healthy: false, 
+                reason: `Health check failed: ${error.message}` 
+            };
         }
     }
 

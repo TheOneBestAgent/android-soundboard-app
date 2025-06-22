@@ -47,7 +47,7 @@ fun ModernVolumeControl(
         targetValue = if (isExpanded) {
             MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
         } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
+            MaterialTheme.colorScheme.surfaceVariant
         },
         animationSpec = tween(300, easing = EaseInOutCubic),
         label = "containerColor"

@@ -1,8 +1,87 @@
 # Active Context: Android Soundboard Application
 
+## Current Focus: Phase 6.0 - Comprehensive Settings Persistence & Path Management ✅ COMPLETED
+
+### 🎯 **Current Status: Phase 6.0 Successfully Completed & APK Built**
+- **Latest APK:** `soundboard-app-v6.0-20250622.apk` (39MB) 
+- **Build Status:** ✅ SUCCESSFUL - All compilation errors resolved
+- **Server Status:** ✅ WORKING - Audio playback functioning perfectly
+- **Connection Status:** ✅ STABLE - WebSocket connections established, transport errors eliminated
+
+### 📋 **Current Active Tasks:**
+1. **Git Automation Rule** - Implement automatic commit and push after successful builds
+2. **Code Quality** - Ensure all changes are properly tracked and versioned
+3. **Development Workflow** - Streamline build-test-deploy cycle
+
+### 🔧 **Phase 6.0 Completed Features:**
+1. **Enhanced SettingsRepository** - Complete settings persistence system
+   - Server connection settings (host, port, auto-connect, connection history)
+   - Path management settings (default paths, resolution strategies, auto-resolve)
+   - Backup & sync settings (auto-backup, frequency, cloud backup, inclusion flags)
+   - Profile settings (current profile, sync enabled)
+
+2. **SoundboardBackupService** - Comprehensive backup/restore system
+   - Complete soundboard profile export/import with metadata
+   - Smart path resolution for cross-device compatibility
+   - Individual layout export/import functionality
+   - Auto-backup capabilities with configurable frequency
+
+3. **PathManagerService** - Intelligent file path resolution
+   - Multiple resolution strategies (Smart, Preserve, Reset)
+   - MediaStore integration for finding files across device storage
+   - Path validation and auto-fixing capabilities
+   - Portable path conversion for cross-device compatibility
+
+4. **PersistenceSettingsDialog** - Professional settings UI
+   - Three organized tabs: Backup & Sync, Path Management, Server & Profile
+   - Action cards for common operations
+   - Comprehensive settings management interface
+
+### 🛠️ **Recent Technical Fixes:**
+- ✅ Added missing DAO methods (`deleteAllLayouts`, `deleteAllSoundButtons`)
+- ✅ Fixed repository method implementations
+- ✅ Resolved type mismatches (Long vs Int for layout IDs)
+- ✅ Removed problematic `layout_id` column references
+- ✅ Fixed compilation errors in backup service
+
+### 🎵 **Audio System Status:**
+- ✅ WebSocket connections stable (no transport errors)
+- ✅ Audio playback working perfectly (both local and uploaded files)
+- ✅ File handling working (temp files created, played, cleaned up)
+- ✅ ADB connection established (device R52W70J9B2R connected)
+
+### 📱 **App Features Status:**
+- ✅ Core soundboard functionality working
+- ✅ MyInstant integration and downloads working
+- ✅ Icon customization and settings dialogs working
+- ✅ Advanced settings, backup/restore, and reset dialogs re-enabled
+- ✅ Comprehensive persistence system implemented
+
+### 🔄 **Development Workflow Rules:**
+1. **Automatic Git Operations** - After successful build status:
+   - Automatically stage all source code changes (exclude build artifacts)
+   - Commit with descriptive message including version and features
+   - Push to remote repository to maintain version history
+   - Generate build tags for APK releases
+
+### 🎯 **Next Potential Enhancements:**
+1. **Enhanced Audio Features** - Advanced audio effects, equalizer, volume profiles
+2. **Cloud Integration** - Google Drive sync, Dropbox support, cloud profiles
+3. **Advanced Layouts** - Custom grid sizes, layout templates, import/export
+4. **Performance Optimization** - Audio caching, faster startup, memory optimization
+5. **User Experience** - Tutorials, onboarding, accessibility improvements
+
+### 🏗️ **Architecture Notes:**
+- MVVM pattern with Jetpack Compose UI
+- Room database for local persistence
+- Socket.io for real-time server communication
+- Hilt for dependency injection
+- Repository pattern for data management
+- Service layer for complex operations (backup, path management)
+
 ## Current Focus
-**Phase:** Phase 5.7 - LAYOUT SELECTION BUG FIX COMPLETED ✅  
-**Status:** Fixed critical bug where layout selection in Layout Manager wasn't working. Root cause was that switchToLayout() method was using separate updateLayout() calls instead of the atomic switchActiveLayout() transaction method. This caused race conditions preventing proper layout switching. Updated ViewModel to use repository.switchActiveLayout() and fixed type mismatch (Long vs Int) in DAO methods. Layout selection now works correctly with atomic database transactions.
+**Phase:** Phase 6.0 - COMPREHENSIVE SETTINGS PERSISTENCE & PATH MANAGEMENT 🎯  
+**Status:** STARTING - Implementing complete settings persistence system so users can set up soundboard once and use it on any computer without reconfiguring paths, layouts, or settings.
 
 ## Recent Decisions
 - **Architecture Choice:** MVVM with Repository pattern for Android app
@@ -14,133 +93,44 @@
 - **Design System:** **Icon-Inspired Dark Theme** with deep blue backgrounds and neon pink/coral accents
 - **Local File Support:** Full device storage access with MediaStore integration and directory browsing
 - **Voicemeeter Integration:** Replace Voicemeeter's macro buttons with our Android soundboard app
+- **NEW: Persistence Strategy:** Complete settings backup/restore system with automatic synchronization
 
-## Phase 3 Completed Features ✅
-1. **USB Connection Implementation (Phase 3.1)** ✅
-   - ADB TCP port forwarding over USB cable
-   - USB debugging setup with 4-step instructions
-   - Complete WiFi-to-USB architecture transition
-   - Server ADB integration and device monitoring
+## Phase 6: Comprehensive Settings Persistence & Path Management 🎯
+**Goal:** Create a seamless experience where users set up the soundboard once and never need to reconfigure paths, layouts, or settings when switching computers.
 
-2. **Advanced Sound Button Features (Phase 3.2)** ✅
-   - Long-press context menus with edit/delete options
-   - Haptic feedback on button interactions
-   - Per-button volume control sliders
-   - Enhanced Material 3 design with glow effects
+### Core Requirements:
+1. **Complete Settings Backup/Restore**
+   - All app settings (theme, audio, connection, etc.)
+   - All layouts with complete configuration
+   - All sound buttons with proper path management
+   - Server connection details and preferences
+   - Custom icons and file associations
 
-3. **Custom Layout System (Phase 3.3)** ✅
-   - Multiple layout presets (Compact, Standard, Wide, Large, StreamDeck, Podcast, Music Producer)
-   - Layout categories (Streaming, Podcasting, Music, Gaming, General, Custom)
-   - Professional template system with 6 predefined templates
-   - Layout management UI with create, duplicate, delete, and switch functionality
-   - Enhanced database schema with layout customization options
+2. **Smart Path Management**
+   - Automatic local file path resolution
+   - Server file path mapping and validation
+   - Cross-device path compatibility
+   - URI-based file handling for Android scoped storage
 
-4. **Icon-Inspired Theme System** ✅
-   - Deep dark blue background (#1A1B3A) matching the beautiful isometric icon
-   - Neon pink primary accent (#FF4081) for buttons and highlights  
-   - Coral secondary accent (#FF6B6B) for plants and secondary elements
-   - Professional gradient surfaces and glow effects
-   - Complete Material 3 color scheme implementation
+3. **Automatic Synchronization**
+   - Auto-backup on major changes
+   - Cloud storage integration (Google Drive)
+   - Version control for settings
+   - Conflict resolution for multiple devices
 
-5. **Local Audio File Support (Phase 3.4)** ✅
-   - Full Android device storage access with proper permissions
-   - MediaStore integration for scanning all audio files on device
-   - Directory browser for browsing specific folders (Music, Downloads, etc.)
-   - Local vs Server file toggle in AddSoundButtonDialog
-   - Enhanced SoundButton model with isLocalFile field
-   - Database migration from version 2 to 3 for local file support
-   - LocalAudioFileManager with support for MP3, WAV, M4A, OGG, FLAC, AAC formats
-   - Permission handling with Accompanist Permissions library
-   - Common directory detection (Music, Downloads, Sounds, etc.)
-
-6. **Audio Forwarding to PC (Phase 3.5)** ✅
-   - Android-to-PC audio forwarding for computer speaker playback
-   - Local audio files from tablet now play through computer speakers
-   - HTTP-based audio data upload with `/play-audio-data` endpoint
-   - Temporary file handling on server with automatic cleanup
-   - Binary audio data streaming from Android to Node.js server
-   - Cross-platform audio playback (macOS afplay, Windows PowerShell, Linux ALSA/PulseAudio)
-   - Volume control and metadata preservation during transfer
-   - OkHttp integration for reliable file uploads with 50MB limit
-
-## Phase 5: Advanced Features & Polish - STARTING NOW 🎯
-**Goal:** Enhance user experience with professional features and streamlined workflows
-
-### New Features Implementation:
-1. **Secondary Connect Button** (Main Screen)
-   - Quick access connection button without going to settings
-   - Visual connection status indicator
-   - One-tap connection for improved UX
-
-2. **MyInstant.com Integration**
-   - Browse and search popular sound effects
-   - Preview sounds before downloading
-   - Direct download to soundboard
-   - Featured sounds and categories
-
-3. **Comprehensive Settings Menu**
-   - Organized settings by category (Connection, Content, Customization, Audio, Advanced)
-   - Visual settings cards with descriptions
-   - Easy navigation and discovery
-
-4. **StreamDeck-Style Icon Customization**
-   - 60+ professional icons across 8 categories
-   - Icon picker with category tabs
-   - Visual icon preview in sound buttons
-   - Enhanced button aesthetics
+4. **Enhanced Import/Export**
+   - Complete soundboard profiles
+   - Individual layout sharing
+   - Settings templates
+   - Bulk operations for sound management
 
 ### Implementation Strategy:
-- **UI Enhancement:** Add secondary connect button to main soundboard screen
-- **Content Integration:** MyInstant downloader with search and preview
-- **Settings Architecture:** Modular settings screen with organized sections
-- **Icon System:** Comprehensive icon library with picker interface
-- **Database Enhancement:** Icon storage in SoundButton model
-
-## Technical Achievements
-- **Database Version 3:** Local file support with isLocalFile field
-- **Threading Fix:** Resolved NetworkOnMainThreadException with proper coroutine contexts
-- **Content URI Support:** Full Android scoped storage compatibility
-- **USB ADB Integration:** Stable port forwarding with device monitoring
-- **Audio Forwarding:** Local files play on computer speakers via HTTP upload
-- **Template System:** 6 professional templates covering streaming, podcasting, music production, gaming
-- **Grid Customization:** Support for 3x4, 4x6, 5x8, 6x4, 8x6 grid configurations
-- **Color Harmony:** Perfect match with the isometric soundboard icon design
-
-## Configuration Decisions Made
-- **Connection Method:** USB cable with ADB port forwarding
-- **Default Grid:** 4x6 layout (24 buttons) for tablet screens
-- **Audio Formats:** Support MP3, WAV, M4A, OGG formats
-- **ADB Ports:** 8080 for Socket.io, 3001 for HTTP API (forwarded through ADB)
-- **USB Requirements:** Android Developer Options enabled, USB Debugging enabled
-- **Theme Defaults:** Always dark theme to maintain professional soundboard aesthetic
-- **Layout Presets:** 8 different configurations for various use cases
-- **Voicemeeter Target:** Focus on cassette feature integration for professional audio workflows
-
-## Implementation Strategy COMPLETED ✅
-### ✅ Phase 3.1: USB Connection Infrastructure - DONE
-- Removed WiFi/mDNS discovery code
-- Added ADB command execution from server
-- Implemented USB connection detection
-- Updated UI to show USB connection status
-
-### ✅ Phase 3.2: Advanced Sound Button Features - DONE
-- Added delete confirmation dialogs
-- Implemented long-press context menus
-- Added volume sliders to button configuration
-- Enhanced haptic feedback and Material 3 design
-
-### ✅ Phase 3.3: Custom Layout System - DONE
-- Multiple layout creation and management
-- Professional template system
-- Grid size customization (3x4, 4x6, 5x8, etc.)
-- Layout switching and duplicate functionality
-- Import/export foundation (ready for future enhancement)
-
-### ✅ Phase 3.5: Audio Forwarding to PC - DONE
-- Local audio files upload and playback on computer speakers
-- HTTP endpoint for binary audio data transfer
-- Cross-platform audio playback via system commands
-- Threading fixes for network operations
+- **Settings Enhancement:** Extend SettingsRepository with server paths and connection details
+- **Database Migration:** Add new tables for server connections and file mappings
+- **Backup System:** Complete backup/restore implementation including layouts and sound buttons
+- **Path Manager:** New service for intelligent path resolution and mapping
+- **Auto-Sync:** Background service for automatic backup and synchronization
+- **Profile System:** User profiles with complete soundboard configurations
 
 ## Phase 5: Advanced Features & Polish - ✅ COMPLETED!
 ### Phase 5.1: UI/UX Enhancements ✅ COMPLETE
@@ -185,6 +175,39 @@
 - ✅ **UI Components:** Reusable settings components (SwitchSetting, SliderSetting)
 - ✅ **Build Success:** All compilation errors resolved and APK created
 
+## Technical Achievements
+- **Database Version 3:** Local file support with isLocalFile field
+- **Threading Fix:** Resolved NetworkOnMainThreadException with proper coroutine contexts
+- **Content URI Support:** Full Android scoped storage compatibility
+- **USB ADB Integration:** Stable port forwarding with device monitoring
+- **Audio Forwarding:** Local files play on computer speakers via HTTP upload
+- **Template System:** 6 professional templates covering streaming, podcasting, music production, gaming
+- **Grid Customization:** Support for 3x4, 4x6, 5x8, 6x4, 8x6 grid configurations
+- **Color Harmony:** Perfect match with the isometric soundboard icon design
+- **Settings Architecture:** Complete settings system with SharedPreferences and StateFlow
+- **Backup Foundation:** Basic backup/restore with JSON export/import capability
+
+## Configuration Decisions Made
+- **Connection Method:** USB cable with ADB port forwarding
+- **Default Grid:** 4x6 layout (24 buttons) for tablet screens
+- **Audio Formats:** Support MP3, WAV, M4A, OGG formats
+- **ADB Ports:** 8080 for Socket.io, 3001 for HTTP API (forwarded through ADB)
+- **USB Requirements:** Android Developer Options enabled, USB Debugging enabled
+- **Theme Defaults:** Always dark theme to maintain professional soundboard aesthetic
+- **Layout Presets:** 8 different configurations for various use cases
+- **Voicemeeter Target:** Focus on cassette feature integration for professional audio workflows
+- **Persistence Strategy:** JSON-based backup with complete app state serialization
+
+## Next Steps for Phase 6.0
+1. **Server Connection Settings** - Add server path and connection persistence
+2. **Enhanced Backup System** - Complete layout and sound button backup/restore
+3. **Path Management Service** - Intelligent file path resolution
+4. **Auto-Backup Service** - Background synchronization
+5. **Profile System** - Complete soundboard configurations
+6. **Cloud Integration** - Google Drive automatic backup
+7. **Import/Export Enhancement** - Individual components and bulk operations
+8. **Version Control** - Settings versioning and conflict resolution
+
 ## Recent Enhancements (Phase 5.1) ✅ COMPLETE
 ### Custom Icon File Picker Implementation
 - **File Picker Integration:** Added native Android file picker for custom icon selection
@@ -198,20 +221,6 @@
 - **IconPickerDialog:** Added "Custom" category with file picker launcher
 - **SoundButtonComponent:** Dual layout system for regular vs custom icons
 - **IconUtils:** Helper functions for custom icon detection and URI extraction
-- **Build System:** Added Coil dependency for image loading
-- **Database:** Existing iconName field supports both regular and custom icons
-
-## Recent Bug Fixes (Phase 5.1.2) ✅ COMPLETE
-### App Restart Connection Issue Resolution
-- **Root Cause:** When app is closed and reopened, Socket.IO reconnects successfully but currentServerUrl becomes null, causing local audio HTTP requests to fail
-- **Fix Applied:** Added intelligent server URL reconstruction in SoundboardRepository
-- **Technical Implementation:**
-  - Created `getServerUrl()` method that reconstructs server URL from connection history when currentServerUrl is null
-  - Added `getOrCreateApiService()` method that recreates API service after app restart
-  - Updated all HTTP request methods to use URL reconstruction logic
-  - Fallback to localhost:8080 for USB connections when connection history unavailable
-- **Result:** Local audio files now work correctly after app close/reopen cycle
-- **Methods Updated:** uploadAndPlayAudioData(), getAvailableAudioFiles(), testServerConnection()
 
 ## Previous Bug Fixes (Phase 5.1.1) ✅ COMPLETE
 ### Audio Playback Issue Resolution

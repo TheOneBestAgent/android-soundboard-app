@@ -131,6 +131,11 @@ class AudioPlayer {
                     afplayArgs.push('-v', volume.toString());
                 }
                 
+                // Add debug flag to get more information
+                afplayArgs.push('-d');
+                
+                console.log(`🔊 Running afplay with args: ${afplayArgs.join(' ')}`);
+                
                 const process = spawn('afplay', afplayArgs, {
                     stdio: ['ignore', 'pipe', 'pipe']
                 });
@@ -139,17 +144,26 @@ class AudioPlayer {
                 this.currentPlaying = process;
                 
                 let hasResolved = false;
+                let audioOutput = '';
+                let errorOutput = '';
                 
                 process.stdout.on('data', (data) => {
-                    console.log(`afplay stdout: ${data}`);
+                    const output = data.toString();
+                    audioOutput += output;
+                    console.log(`🔊 afplay stdout: ${output.trim()}`);
                 });
                 
                 process.stderr.on('data', (data) => {
-                    console.error(`afplay stderr: ${data}`);
+                    const output = data.toString();
+                    errorOutput += output;
+                    console.error(`🔊 afplay stderr: ${output.trim()}`);
                 });
                 
-                process.on('close', (code) => {
-                    console.log(`macOS audio playback finished with code: ${code}`);
+                process.on('close', (code, signal) => {
+                    console.log(`🔊 macOS audio playback finished with code: ${code}, signal: ${signal}`);
+                    if (audioOutput) console.log(`🔊 Audio output: ${audioOutput.trim()}`);
+                    if (errorOutput) console.log(`🔊 Error output: ${errorOutput.trim()}`);
+                    
                     this.currentPlaying = null;
                     if (!hasResolved) {
                         hasResolved = true;
@@ -158,7 +172,7 @@ class AudioPlayer {
                 });
                 
                 process.on('error', (error) => {
-                    console.error('macOS audio playback error:', error);
+                    console.error(`🔊 macOS audio playback error: ${error.message}`);
                     this.currentPlaying = null;
                     if (!hasResolved) {
                         hasResolved = true;
@@ -169,18 +183,45 @@ class AudioPlayer {
                 // Test if afplay is actually working by checking after a short delay
                 setTimeout(() => {
                     if (!hasResolved && this.currentPlaying && !this.currentPlaying.killed) {
-                        console.log('afplay process started successfully');
-                        hasResolved = true;
-                        resolve(true);
+                        console.log('🔊 afplay process started successfully');
                     } else if (!hasResolved) {
-                        console.error('afplay failed to start properly');
+                        console.error('🔊 afplay failed to start properly');
                         hasResolved = true;
                         resolve(false);
                     }
-                }, 500);
+                }, 100);
+                
+                // Also try alternative approach if afplay doesn't work
+                setTimeout(async () => {
+                    if (!hasResolved) {
+                        console.log('🔊 afplay taking too long, trying alternative approach...');
+                        try {
+                            // Try using osascript to play sound as backup
+                            const osascriptProcess = spawn('osascript', [
+                                '-e', 
+                                `do shell script "afplay '${filePath.replace(/'/g, "\\'")}' &"`
+                            ], { stdio: 'pipe' });
+                            
+                            osascriptProcess.on('close', (code) => {
+                                if (!hasResolved) {
+                                    console.log(`🔊 Alternative osascript approach finished with code: ${code}`);
+                                    hasResolved = true;
+                                    resolve(code === 0);
+                                }
+                            });
+                            
+                        } catch (altError) {
+                            console.error(`🔊 Alternative approach failed: ${altError.message}`);
+                            if (!hasResolved) {
+                                hasResolved = true;
+                                resolve(false);
+                            }
+                        }
+                    }
+                }, 2000);
                 
             } catch (error) {
-                console.error('macOS playback error:', error);
+                console.error('🔊 macOS playback error:', error);
                 resolve(false);
             }
         });
@@ -255,16 +296,44 @@ class AudioPlayer {
     }
     
     getSupportedFormats() {
-        switch (this.platform) {
-            case 'win32':
-                return ['mp3', 'wav', 'm4a', 'wma'];
-            case 'darwin':
-                return ['mp3', 'wav', 'm4a', 'aac', 'aiff'];
-            case 'linux':
-                return ['mp3', 'wav', 'ogg', 'flac'];
-            default:
-                return ['wav']; // Most universal format
+        return ['.mp3', '.wav', '.m4a', '.ogg', '.aac', '.flac'];
+    }
+    
+    // Test function to verify audio is working
+    async testAudio() {
+        console.log('🔊 Testing audio system...');
+        console.log(`🔊 Platform: ${this.platform}`);
+        console.log(`🔊 Audio directory: ${this.audioDir}`);
+        
+        // Test system audio first
+        try {
+            if (this.platform === 'darwin') {
+                console.log('🔊 Testing macOS system beep...');
+                const beepProcess = spawn('osascript', ['-e', 'beep'], { stdio: 'pipe' });
+                
+                return new Promise((resolve) => {
+                    beepProcess.on('close', (code) => {
+                        console.log(`🔊 System beep test finished with code: ${code}`);
+                        resolve(code === 0);
+                    });
+                    
+                    beepProcess.on('error', (error) => {
+                        console.error(`🔊 System beep test failed: ${error.message}`);
+                        resolve(false);
+                    });
+                    
+                    setTimeout(() => {
+                        console.log('🔊 System beep test completed');
+                        resolve(true);
+                    }, 1000);
+                });
+            }
+        } catch (error) {
+            console.error('🔊 Audio test error:', error);
+            return false;
         }
+        
+        return true;
     }
 }
 

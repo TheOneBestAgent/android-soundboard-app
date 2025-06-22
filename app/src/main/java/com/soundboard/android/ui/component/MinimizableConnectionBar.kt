@@ -58,7 +58,7 @@ fun MinimizableConnectionBar(
             isConnected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
             isError -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f)
             isConnecting -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.8f)
-            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.surfaceVariant
         },
         animationSpec = tween(400, easing = EaseInOutCubic),
         label = "containerColor"

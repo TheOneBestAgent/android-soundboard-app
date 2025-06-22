@@ -8,7 +8,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
-import com.google.api.client.extensions.android.http.AndroidHttp
+import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
@@ -64,7 +64,7 @@ class GoogleDriveService @Inject constructor(
                     credential.selectedAccount = account.account
                     
                     driveService = Drive.Builder(
-                        AndroidHttp.newCompatibleTransport(),
+                        NetHttpTransport(),
                         GsonFactory(),
                         credential
                     )
@@ -208,11 +208,4 @@ class GoogleDriveService @Inject constructor(
     }
     
     fun getSignInClient(): GoogleSignInClient? = googleSignInClient
-}
-
-data class BackupFile(
-    val id: String,
-    val name: String,
-    val createdTime: Long,
-    val size: Long
-) 
+} 

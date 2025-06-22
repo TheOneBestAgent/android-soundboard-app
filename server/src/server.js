@@ -14,39 +14,34 @@ class SoundboardServer {
         this.app = express();
         this.server = http.createServer(this.app);
         
-        // Configure Socket.io with enhanced transport handling for stability
+        // Configure Socket.io for WEBSOCKET-ONLY communication
         this.io = new Server(this.server, {
             cors: {
                 origin: "*",
                 methods: ["GET", "POST"]
             },
-            // Enhanced transport configuration for better stability
-            transports: ['websocket', 'polling'], // Prefer websocket for localhost
-            // Increased timeouts to prevent transport errors
-            pingTimeout: 90000, // 90 seconds (increased from 60)
-            pingInterval: 30000, // 30 seconds (increased from 25)
-            // Upgrade timeout - more generous for mobile connections
-            upgradeTimeout: 45000, // 45 seconds
-            // Connection state recovery with longer duration
-            connectionStateRecovery: {
-                maxDisconnectionDuration: 5 * 60 * 1000, // 5 minutes
-                skipMiddlewares: true,
-            },
-            // Additional stability options
-            allowEIO3: true, // Allow Engine.IO v3 clients
-            serveClient: false, // Don't serve client files
-            // Enhanced transport stability
-            httpCompression: true, // Enable compression
-            perMessageDeflate: true, // Enable WebSocket compression
-            maxHttpBufferSize: 1e8, // 100MB buffer for large audio files
-            // Polling configuration for better stability
-            pollingTimeout: 30000, // 30 seconds for polling requests
-            // Connection validation
+            // WEBSOCKET ONLY - no polling transport
+            transports: ['websocket'],
+            // Optimized timeouts for WebSocket-only
+            pingTimeout: 30000,   // 30 seconds
+            pingInterval: 15000,  // 15 seconds
+            // WebSocket-specific optimizations
+            upgradeTimeout: 3000, // Short timeout since no upgrade needed
+            maxHttpBufferSize: 1e6, // 1MB buffer
+            // Disable features not needed for WebSocket-only
+            allowEIO3: false,
+            serveClient: false,
+            connectionStateRecovery: false,
+            httpCompression: false,
+            perMessageDeflate: false,
+            // WebSocket-specific validation
             allowRequest: (req, callback) => {
-                // Allow all connections but log them
-                const origin = req.headers.origin || 'unknown';
-                console.log(`🔗 Connection request from: ${origin}`);
-                callback(null, true);
+                // Only allow WebSocket connections
+                const isWebSocket = req.headers.upgrade === 'websocket';
+                if (!isWebSocket) {
+                    console.log('❌ Rejected non-WebSocket connection');
+                }
+                callback(null, isWebSocket);
             }
         });
         
@@ -55,6 +50,15 @@ class SoundboardServer {
         this.adbManager = new AdbManager();
         this.connectedClients = new Map();
         this.audioFiles = new Map(); // Store audio file metadata
+        
+        // Connection monitoring and health check system
+        this.startTime = Date.now();
+        this.connectionStats = {
+            totalConnections: 0,
+            activeConnections: new Map(),
+            connectionHistory: [],
+            startTime: this.startTime
+        };
         
         this.setupMiddleware();
         this.setupRoutes();
@@ -80,14 +84,22 @@ class SoundboardServer {
     setupRoutes() {
         // Health check endpoint
         this.app.get('/health', (req, res) => {
-            console.log(`${new Date().toISOString()} - GET /health`);
-            res.json({
-                status: 'ok',
-                server_version: '1.0.0',
-                connected_clients: this.connectedClients.size,
-                supported_formats: ['mp3', 'wav', 'm4a', 'ogg'],
-                timestamp: new Date().toISOString()
-            });
+            const uptime = Date.now() - this.startTime;
+            const healthStatus = {
+                status: 'healthy',
+                uptime: uptime,
+                connections: {
+                    total: this.connectionStats.totalConnections,
+                    active: this.connectionStats.activeConnections.size,
+                    history: this.connectionStats.connectionHistory.slice(-10) // Last 10 connections
+                },
+                server: {
+                    memory: process.memoryUsage(),
+                    timestamp: new Date().toISOString()
+                }
+            };
+            
+            res.json(healthStatus);
         });
         
         // Server information
@@ -204,6 +216,53 @@ class SoundboardServer {
             }
         });
 
+        // Audio test endpoint
+        this.app.get('/audio/test', async (req, res) => {
+            try {
+                console.log('🔊 Audio test endpoint called');
+                const testResult = await this.audioPlayer.testAudio();
+                
+                res.json({
+                    status: testResult ? 'success' : 'error',
+                    message: testResult ? 'Audio system test passed' : 'Audio system test failed',
+                    platform: process.platform,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (error) {
+                console.error('🔊 Audio test endpoint error:', error);
+                res.status(500).json({
+                    status: 'error',
+                    message: error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+
+        // Play audio file test endpoint
+        this.app.get('/audio/play/:filename', async (req, res) => {
+            try {
+                const filename = req.params.filename;
+                console.log(`🔊 Playing audio file: ${filename}`);
+                
+                const audioPath = path.join(__dirname, '../audio', filename);
+                const success = await this.audioPlayer.playSound(audioPath, 1.0);
+                
+                res.json({
+                    status: success ? 'success' : 'error',
+                    message: success ? `Playing ${filename}` : `Failed to play ${filename}`,
+                    filename: filename,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (error) {
+                console.error('🔊 Play audio file error:', error);
+                res.status(500).json({
+                    status: 'error',
+                    message: error.message,
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+
         // ADB status endpoint
         this.app.get('/adb/status', async (req, res) => {
             const isAvailable = await this.adbManager.checkAdbAvailable();
@@ -309,258 +368,74 @@ class SoundboardServer {
     
     setupSocketHandlers() {
         this.io.on('connection', (socket) => {
+            // WebSocket-only connection handling
+            console.log(`🌐 WebSocket connected: ${socket.id}`);
+            console.log(`   🚀 Transport: ${socket.conn.transport.name}`);
+            console.log(`   📍 Address: ${socket.handshake.address}`);
+            
+            // Verify it's actually WebSocket
+            if (socket.conn.transport.name !== 'websocket') {
+                console.warn(`⚠️  Expected WebSocket, got: ${socket.conn.transport.name}`);
+            }
+            
+            // Update connection statistics
+            this.connectionStats.totalConnections++;
             const clientInfo = {
                 id: socket.id,
-                connectedAt: new Date(),
-                lastActivity: new Date(),
+                connectedAt: new Date().toISOString(),
                 transport: socket.conn.transport.name,
-                remoteAddress: socket.handshake.address
+                address: socket.handshake.address
             };
+            this.connectionStats.activeConnections.set(socket.id, clientInfo);
             
-            this.connectedClients.set(socket.id, clientInfo);
-            console.log(`📱 Android device connected: ${socket.id} (transport: ${clientInfo.transport})`);
+            console.log(`🔗 Active WebSocket connections: ${this.connectionStats.activeConnections.size}`);
             
-            // Send initial connection confirmation with server details
+            // WebSocket ping/pong handling
+            socket.on('ping', (data) => {
+                console.log(`🏓 WebSocket ping from ${socket.id}`);
+                socket.emit('pong', { 
+                    timestamp: Date.now(),
+                    serverUptime: Date.now() - this.startTime
+                });
+            });
+            
+            // Handle play sound commands
+            socket.on('play_sound', (data) => {
+                console.log(`🎵 Play sound request from ${socket.id}:`, data);
+                // Handle sound playing logic here
+            });
+            
+            // Handle client info updates
+            socket.on('client_info', (data) => {
+                console.log(`📋 Client info from ${socket.id}:`, data);
+                const client = this.connectionStats.activeConnections.get(socket.id);
+                if (client) {
+                    Object.assign(client, data);
+                    this.connectionStats.activeConnections.set(socket.id, client);
+                }
+            });
+            
+            // WebSocket disconnection handling
+            socket.on('disconnect', (reason) => {
+                console.log(`❌ WebSocket disconnected: ${socket.id}, reason: ${reason}`);
+                this.connectionStats.activeConnections.delete(socket.id);
+                console.log(`🔗 Active WebSocket connections: ${this.connectionStats.activeConnections.size}`);
+            });
+            
+            // Error handling
+            socket.on('error', (error) => {
+                console.error(`❌ WebSocket error for ${socket.id}:`, error);
+            });
+
+            // Send initial connection confirmation
             socket.emit('server_status', {
                 connected: true,
+                transport: 'websocket',
                 serverTime: new Date().toISOString(),
-                capabilities: ['audio_forward', 'file_upload', 'ping_pong', 'authentication'],
-                transport: clientInfo.transport
-            });
-
-            // Handle transport upgrades with detailed logging
-            socket.conn.on('upgrade', () => {
-                const newTransport = socket.conn.transport.name;
-                console.log(`🔄 Transport upgraded for ${socket.id}: ${clientInfo.transport} → ${newTransport}`);
-                clientInfo.transport = newTransport;
-                this.connectedClients.set(socket.id, clientInfo);
-                
-                // Log successful upgrade for debugging
-                console.log(`✅ ${socket.id} now using ${newTransport} transport`);
-            });
-
-            // Enhanced transport error handling
-            socket.conn.on('error', (error) => {
-                console.error(`❌ Transport error for ${socket.id} (${clientInfo.transport}):`, error.message);
-                // Log additional error details for debugging
-                if (error.code) {
-                    console.error(`   Error code: ${error.code}`);
-                }
-                if (error.type) {
-                    console.error(`   Error type: ${error.type}`);
-                }
-            });
-            
-            // Handle transport close events
-            socket.conn.on('close', (reason) => {
-                console.log(`🔌 Transport closed for ${socket.id}: ${reason}`);
-            });
-
-            // Handle authentication (for compatibility with Android app)
-            socket.on('authenticate', (data) => {
-                try {
-                    console.log(`🔐 Authentication request from ${socket.id}:`, data);
-                    
-                    // Parse authentication data
-                    let authData;
-                    if (typeof data === 'string') {
-                        authData = JSON.parse(data);
-                    } else {
-                        authData = data;
-                    }
-                    
-                    // Update client info
-                    clientInfo.lastActivity = new Date();
-                    clientInfo.authenticated = true;
-                    clientInfo.clientType = authData.client_type;
-                    clientInfo.version = authData.version;
-                    this.connectedClients.set(socket.id, clientInfo);
-                    
-                    // Send authentication success response
-                    socket.emit('authenticated', {
-                        status: 'success',
-                        message: 'Authentication successful',
-                        server_info: {
-                            computer_name: require('os').hostname(),
-                            server_version: '1.0.0',
-                            supported_formats: ['mp3', 'wav', 'm4a', 'ogg'],
-                            platform: process.platform,
-                            capabilities: ['audio_forward', 'file_upload', 'ping_pong'],
-                            transport: clientInfo.transport
-                        }
-                    });
-                    
-                    console.log(`✅ Client ${socket.id} authenticated successfully (${authData.client_type} v${authData.version})`);
-                    
-                } catch (error) {
-                    console.error(`❌ Authentication error for ${socket.id}:`, error.message);
-                    socket.emit('authenticated', {
-                        status: 'error',
-                        message: 'Authentication failed',
-                        error: error.message
-                    });
-                }
-            });
-
-            // Handle audio file forwarding
-            socket.on('forward_audio', async (data) => {
-                try {
-                    if (!data.audioData || !data.fileName) {
-                        socket.emit('forward_error', { error: 'Missing audio data or file name' });
-                        return;
-                    }
-
-                    // Update client activity
-                    clientInfo.lastActivity = new Date();
-                    this.connectedClients.set(socket.id, clientInfo);
-
-                    console.log(`🎵 Forwarding audio from ${socket.id}: ${data.fileName}`);
-                    
-                    // Ensure temp directory exists
-                    const tempDir = path.join(process.cwd(), 'temp');
-                    if (!fs.existsSync(tempDir)) {
-                        fs.mkdirSync(tempDir, { recursive: true });
-                    }
-                    
-                    // Create temp file with proper extension
-                    const fileExtension = path.extname(data.fileName) || '.wav';
-                    const timestamp = Date.now();
-                    const tempFileName = `temp_${timestamp}_${data.fileName.replace(/[^a-zA-Z0-9.-_]/g, '_')}`;
-                    const tempFilePath = path.join(tempDir, tempFileName);
-
-                    // Convert Base64 to Buffer and write file
-                    const audioBuffer = Buffer.from(data.audioData, 'base64');
-                    fs.writeFileSync(tempFilePath, audioBuffer);
-                    
-                    // Verify file was created and has content
-                    if (!fs.existsSync(tempFilePath)) {
-                        throw new Error(`Failed to create temp file: ${tempFilePath}`);
-                    }
-                    
-                    const fileStats = fs.statSync(tempFilePath);
-                    if (fileStats.size === 0) {
-                        fs.unlinkSync(tempFilePath); // Clean up empty file
-                        throw new Error(`Temp file is empty: ${tempFilePath}`);
-                    }
-                    
-                    console.log(`📁 Audio file saved: ${tempFileName} (${fileStats.size} bytes)`);
-
-                    // Play audio through Voicemeeter
-                    if (this.voicemeeterManager) {
-                        try {
-                            await this.voicemeeterManager.playAudio(tempFilePath);
-                            console.log('🔊 Audio forwarded to Voicemeeter successfully');
-                            socket.emit('forward_success', { 
-                                message: 'Audio forwarded successfully',
-                                fileName: data.fileName,
-                                fileSize: fileStats.size
-                            });
-                        } catch (voicemeeterError) {
-                            console.error('❌ Voicemeeter playback failed:', voicemeeterError.message);
-                            socket.emit('forward_error', { 
-                                error: 'Failed to play audio through Voicemeeter',
-                                details: voicemeeterError.message
-                            });
-                        }
-                    } else {
-                        console.log('⚠️ Voicemeeter not available - audio file saved but not played');
-                        socket.emit('forward_success', { 
-                            message: 'Audio file saved (Voicemeeter not available)',
-                            fileName: data.fileName,
-                            fileSize: fileStats.size
-                        });
-                    }
-
-                    // Schedule file cleanup after a delay
-                    setTimeout(() => {
-                        try {
-                            if (fs.existsSync(tempFilePath)) {
-                                fs.unlinkSync(tempFilePath);
-                                console.log(`🧹 Cleaned up temp file: ${tempFileName}`);
-                            }
-                        } catch (cleanupError) {
-                            console.error('❌ Error cleaning up temp file:', cleanupError.message);
-                        }
-                    }, 30000); // Clean up after 30 seconds
-
-                } catch (error) {
-                    console.error(`❌ Audio forwarding error from ${socket.id}:`, error.message);
-                    socket.emit('forward_error', { 
-                        error: 'Failed to forward audio',
-                        details: error.message
-                    });
-                }
-            });
-
-            // Enhanced ping/pong handling for connection health monitoring
-            socket.on('ping', (data) => {
-                // Update client activity
-                clientInfo.lastActivity = new Date();
-                this.connectedClients.set(socket.id, clientInfo);
-                
-                // Support both old and new ping formats
-                const pingData = data || {};
-                const serverTime = Date.now();
-                
-                // Create comprehensive pong response
-                const response = {
-                    ...pingData,
-                    serverTime: serverTime,
-                    serverTimestamp: serverTime, // For compatibility
-                    transport: clientInfo.transport,
-                    connectionId: socket.id
-                };
-                
-                // Support both clientTimestamp and timestamp for latency calculation
-                if (typeof pingData === 'number') {
-                    // Simple timestamp format
-                    response.clientTimestamp = pingData;
-                } else if (pingData.timestamp) {
-                    response.clientTimestamp = pingData.timestamp;
-                } else if (typeof pingData === 'object' && pingData.clientTimestamp) {
-                    response.clientTimestamp = pingData.clientTimestamp;
-                }
-                
-                // Log ping/pong for debugging (only occasionally to avoid spam)
-                if (Math.random() < 0.1) { // 10% chance to log
-                    console.log(`📡 Ping/Pong with ${socket.id} (${clientInfo.transport})`);
-                }
-                
-                socket.emit('pong', response);
-            });
-
-            // Handle disconnect with more detailed logging
-            socket.on('disconnect', (reason) => {
-                const clientData = this.connectedClients.get(socket.id);
-                const sessionDuration = clientData ? 
-                    Math.round((Date.now() - clientData.connectedAt.getTime()) / 1000) : 0;
-                
-                console.log(`📱 Android device disconnected: ${socket.id} (reason: ${reason}, session: ${sessionDuration}s)`);
-                
-                // Clean up client data
-                this.connectedClients.delete(socket.id);
-                
-                // Log disconnect reason details
-                if (reason === 'transport error') {
-                    console.log(`⚠️ Transport error disconnect - this may indicate network instability`);
-                } else if (reason === 'ping timeout') {
-                    console.log(`⏰ Ping timeout disconnect - client may have network issues`);
-                }
-            });
-
-            // Handle connection errors
-            socket.on('error', (error) => {
-                console.error(`❌ Socket error for ${socket.id}:`, error);
+                capabilities: ['audio_forward', 'file_upload', 'ping_pong'],
+                uptime: Date.now() - this.startTime
             });
         });
-        
-        // Log connection statistics periodically
-        setInterval(() => {
-            const activeConnections = this.connectedClients.size;
-            if (activeConnections > 0) {
-                console.log(`📊 Active connections: ${activeConnections}`);
-            }
-        }, 60000); // Every minute
     }
     
     async setupAudioDirectory() {
@@ -731,7 +606,7 @@ server.start(port);
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('\nShutting down server gracefully...');
+    console.log('\n🛑 Graceful shutdown initiated...');
     
     // Clean up ADB connections
     if (server.adbManager) {
@@ -756,8 +631,28 @@ process.on('SIGINT', async () => {
         console.warn('Could not clean up temp directory:', error.message);
     }
     
-    console.log('Server shutdown complete');
-    process.exit(0);
+    // Close all socket connections
+    server.io.close(() => {
+        console.log('✅ All socket connections closed');
+        
+        // Close HTTP server
+        server.server.close(() => {
+            console.log('✅ HTTP server closed');
+            process.exit(0);
+        });
+    });
 });
+
+process.on('SIGTERM', () => {
+    console.log('\n🛑 SIGTERM received - shutting down gracefully...');
+    
+    server.io.close(() => {
+        server.server.close(() => {
+            process.exit(0);
+        });
+    });
+});
+
+console.log('🎵 Soundboard server enhanced with improved connection management');
 
 module.exports = SoundboardServer; 

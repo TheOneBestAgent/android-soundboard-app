@@ -25,6 +25,9 @@ interface SoundboardLayoutDao {
     @Delete
     suspend fun deleteLayout(layout: SoundboardLayout)
     
+    @Query("DELETE FROM soundboard_layouts")
+    suspend fun deleteAllLayouts()
+    
     @Query("UPDATE soundboard_layouts SET is_active = 0")
     suspend fun deactivateAllLayouts()
     

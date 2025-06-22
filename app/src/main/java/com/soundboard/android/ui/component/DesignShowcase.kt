@@ -97,7 +97,7 @@ fun DesignShowcase(
             Spacer(modifier = Modifier.height(8.dp))
             
             MinimizableConnectionBar(
-                connectionStatus = ConnectionStatus.Connected,
+                connectionStatus = ConnectionStatus.Connected(latencyMs = 25L),
                 serverInfo = "192.168.1.100:8080",
                 onConnectionClick = { },
                 onSettingsClick = { },
@@ -118,31 +118,34 @@ fun DesignShowcase(
             ModernVolumeControl(
                 soundButtons = listOf(
                     SoundButton(
-                        id = 1,
                         name = "Sample 1",
-                        filename = "sample1.mp3",
-                        volume = 0.8f,
+                        filePath = "sample1.mp3",
+                        isLocalFile = false,
                         positionX = 0,
                         positionY = 0,
-                        layoutId = 1
+                        volume = 0.8f,
+                        createdAt = System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
                     ),
                     SoundButton(
-                        id = 2,
                         name = "Sample 2",
-                        filename = "sample2.mp3",
-                        volume = 0.6f,
+                        filePath = "sample2.mp3",
+                        isLocalFile = false,
                         positionX = 1,
                         positionY = 0,
-                        layoutId = 1
+                        volume = 0.6f,
+                        createdAt = System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
                     ),
                     SoundButton(
-                        id = 3,
                         name = "Sample 3",
-                        filename = "sample3.mp3",
-                        volume = 0.3f,
+                        filePath = "sample3.mp3",
+                        isLocalFile = false,
                         positionX = 2,
                         positionY = 0,
-                        layoutId = 1
+                        volume = 0.3f,
+                        createdAt = System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
                     )
                 ),
                 onGlobalVolumeChange = { },

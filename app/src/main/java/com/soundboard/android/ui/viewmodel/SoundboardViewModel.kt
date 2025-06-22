@@ -137,11 +137,22 @@ class SoundboardViewModel @Inject constructor(
         }
     }
     
-    fun connectViaUSB() {
+    fun connectViaUSB(context: android.content.Context) {
         viewModelScope.launch {
             try {
                 // Connect via USB using ADB reverse port forwarding
-                repository.getSocketManager().connectViaUSB()
+                repository.getSocketManager().connectViaUSB(
+                    context = context,
+                    serverUrl = "http://localhost:8080",
+                    onResult = { success, message ->
+                        if (success) {
+                            android.util.Log.d("SoundboardViewModel", "✅ USB connection successful")
+                        } else {
+                            android.util.Log.e("SoundboardViewModel", "❌ USB connection failed: $message")
+                            _uiState.update { it.copy(errorMessage = message ?: "USB connection failed") }
+                        }
+                    }
+                )
                 
                 // Set up the API service for HTTP requests
                 repository.connectToServer("localhost", 8080)

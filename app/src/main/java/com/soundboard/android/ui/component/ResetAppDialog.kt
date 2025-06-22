@@ -228,13 +228,14 @@ fun ResetAppDialog(
                                         else -> false
                                     }
                                     
-                                    val onCheckedChange: (Boolean) -> Unit = when (option.name) {
-                                        "App Settings" -> { resetSettings = it }
-                                        "Soundboard Layouts" -> { resetLayouts = it }
-                                        "Sound Buttons" -> { resetSoundButtons = it }
-                                        "Connection History" -> { resetConnections = it }
-                                        "Downloaded Files" -> { resetDownloads = it }
-                                        else -> { _ -> }
+                                    val onCheckedChange: (Boolean) -> Unit = { checked ->
+                                        when (option.name) {
+                                            "App Settings" -> resetSettings = checked
+                                            "Soundboard Layouts" -> resetLayouts = checked
+                                            "Sound Buttons" -> resetSoundButtons = checked
+                                            "Connection History" -> resetConnections = checked
+                                            "Downloaded Files" -> resetDownloads = checked
+                                        }
                                     }
                                     
                                     ResetOptionCard(
@@ -321,81 +322,7 @@ fun ResetAppDialog(
     }
 }
 
-@Composable
-private fun ResetOptionCard(
-    option: ResetOption,
-    isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!isChecked) },
-        colors = CardDefaults.cardColors(
-            containerColor = if (isChecked) {
-                if (option.isDestructive) 
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                else 
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            }
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(
-                checked = isChecked,
-                onCheckedChange = onCheckedChange,
-                colors = CheckboxDefaults.colors(
-                    checkedColor = if (option.isDestructive) 
-                        MaterialTheme.colorScheme.error 
-                    else 
-                        MaterialTheme.colorScheme.primary
-                )
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Icon(
-                imageVector = option.icon,
-                contentDescription = null,
-                tint = if (option.isDestructive) 
-                    MaterialTheme.colorScheme.error 
-                else 
-                    MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = option.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = if (option.isDestructive && isChecked) 
-                        MaterialTheme.colorScheme.error 
-                    else 
-                        MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = option.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (option.isDestructive) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "Destructive action",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
+
 
 private suspend fun performReset(
     settingsRepository: com.soundboard.android.data.repository.SettingsRepository,
@@ -429,5 +356,66 @@ private suspend fun performReset(
         
     } catch (e: Exception) {
         throw Exception("Failed to reset app: ${e.message}")
+    }
+}
+
+@Composable
+fun ResetOptionCard(
+    option: ResetOption,
+    isChecked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!isChecked) },
+        colors = CardDefaults.cardColors(
+            containerColor = if (option.isDestructive && isChecked) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = isChecked,
+                onCheckedChange = onCheckedChange
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Icon(
+                imageVector = option.icon,
+                contentDescription = null,
+                tint = if (option.isDestructive && isChecked) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = option.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = if (option.isDestructive && isChecked) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+                Text(
+                    text = option.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }

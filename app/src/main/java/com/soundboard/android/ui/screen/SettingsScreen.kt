@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,11 +22,8 @@ import com.soundboard.android.ui.component.ConnectionDialog
 import com.soundboard.android.ui.component.UsbConnectionDialog
 import com.soundboard.android.ui.component.MyInstantDownloader
 import com.soundboard.android.ui.component.AppearanceSettingsDialog
-import com.soundboard.android.ui.component.AdvancedSettingsDialog
 import com.soundboard.android.ui.component.DownloadLocationDialog
 import com.soundboard.android.ui.component.GridLayoutSettingsDialog
-import com.soundboard.android.ui.component.BackupRestoreDialog
-import com.soundboard.android.ui.component.ResetAppDialog
 import com.soundboard.android.ui.viewmodel.SoundboardViewModel
 import com.soundboard.android.data.repository.SettingsRepository
 import javax.inject.Inject
@@ -54,11 +52,8 @@ fun SettingsScreen(
     var showUsbConnectionDialog by remember { mutableStateOf(false) }
     var showMyInstantDownloader by remember { mutableStateOf(false) }
     var showAppearanceSettings by remember { mutableStateOf(false) }
-    var showAdvancedSettings by remember { mutableStateOf(false) }
     var showDownloadLocationDialog by remember { mutableStateOf(false) }
     var showGridLayoutSettings by remember { mutableStateOf(false) }
-    var showBackupRestoreDialog by remember { mutableStateOf(false) }
-    var showResetAppDialog by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     
     val downloadLocation by settingsRepository.downloadLocation.collectAsState()
@@ -152,29 +147,6 @@ fun SettingsScreen(
                     onClick = { /* TODO: Audio quality settings */ }
                 )
             )
-        ),
-        SettingsSection(
-            title = "Advanced",
-            items = listOf(
-                SettingsItem(
-                    title = "Developer Options",
-                    subtitle = "Debug settings and logs",
-                    icon = Icons.Default.Code,
-                    onClick = { showAdvancedSettings = true }
-                ),
-                SettingsItem(
-                    title = "Backup & Restore",
-                    subtitle = "Export/import configurations",
-                    icon = Icons.Default.Backup,
-                    onClick = { showBackupRestoreDialog = true }
-                ),
-                SettingsItem(
-                    title = "Reset App",
-                    subtitle = "Reset all settings to defaults",
-                    icon = Icons.Default.RestartAlt,
-                    onClick = { showResetAppDialog = true }
-                )
-            )
         )
     )
     
@@ -241,10 +213,11 @@ fun SettingsScreen(
     }
     
     if (showUsbConnectionDialog) {
+        val context = LocalContext.current
         UsbConnectionDialog(
             onDismiss = { showUsbConnectionDialog = false },
             onConnect = {
-                viewModel.connectViaUSB()
+                viewModel.connectViaUSB(context)
                 showUsbConnectionDialog = false
             }
         )
@@ -263,13 +236,6 @@ fun SettingsScreen(
     if (showAppearanceSettings) {
         AppearanceSettingsDialog(
             onDismiss = { showAppearanceSettings = false },
-            settingsRepository = settingsRepository
-        )
-    }
-    
-    if (showAdvancedSettings) {
-        AdvancedSettingsDialog(
-            onDismiss = { showAdvancedSettings = false },
             settingsRepository = settingsRepository
         )
     }
@@ -296,25 +262,6 @@ fun SettingsScreen(
                 }
             )
         }
-    }
-    
-    if (showBackupRestoreDialog) {
-        BackupRestoreDialog(
-            onDismiss = { showBackupRestoreDialog = false },
-            settingsRepository = settingsRepository,
-            onShowMessage = { message -> snackbarMessage = message }
-        )
-    }
-    
-    if (showResetAppDialog) {
-        ResetAppDialog(
-            onDismiss = { showResetAppDialog = false },
-            settingsRepository = settingsRepository,
-            onShowMessage = { message -> snackbarMessage = message },
-            onResetComplete = {
-                // Optionally navigate back or refresh the UI
-            }
-        )
     }
 }
 

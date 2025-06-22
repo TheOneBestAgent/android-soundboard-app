@@ -1,5 +1,12 @@
 package com.soundboard.android.network
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.google.gson.Gson
 import com.soundboard.android.network.model.PlaySoundCommand
@@ -11,6 +18,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONObject
 import java.net.URISyntaxException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,6 +52,7 @@ class SocketManager @Inject constructor() {
     private var socket: Socket? = null
     private val gson = Gson()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var analytics: ConnectionAnalytics? = null
     
     // Connection state management
     private val _connectionStatus = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Disconnected)
@@ -73,6 +82,18 @@ class SocketManager @Inject constructor() {
     private var lastTransportError = 0L
     private var transportErrorResetTime = 60000L // Reset count after 1 minute
     
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var connectivityManager: ConnectivityManager? = null
+    private var lastNetworkType: NetworkType = NetworkType.UNKNOWN
+    private var connectionAttempts = 0
+    private val maxConnectionAttempts = 5
+    private var lastConnectionTime = 0L
+    private val minReconnectInterval = 1000L // 1 second minimum between reconnects
+    
+    enum class NetworkType {
+        WIFI, MOBILE, ETHERNET, UNKNOWN
+    }
+    
     companion object {
         private const val TAG = "SocketManager"
         private const val CONNECTION_TIMEOUT = 30000L // Increased to 30 seconds
@@ -82,16 +103,276 @@ class SocketManager @Inject constructor() {
         private const val PING_TIMEOUT = 60000L // 60 seconds
     }
     
-    fun connectViaUSB(port: Int = 8080) {
-        // Connect via USB using ADB port forwarding - always use localhost
-        Log.d(TAG, "🔌 Connecting via USB with improved connection management...")
-        _connectionStatus.value = ConnectionStatus.Connecting
-        isManualDisconnect = false
+    fun connectViaUSB(context: Context, serverUrl: String, onResult: (Boolean, String?) -> Unit) {
+        Log.d(TAG, "Starting USB connection to: $serverUrl")
         
-        // Add delay to allow reverse port forwarding to establish
-        scope.launch {
-            delay(2000) // Wait 2 seconds
-            connect("localhost", port)
+        // Initialize analytics
+        analytics = ConnectionAnalytics(context)
+        
+        // Reset connection attempts for new connection
+        connectionAttempts = 0
+        
+        // Setup network monitoring
+        setupNetworkMonitoring(context)
+        
+        try {
+            disconnect()
+            
+            // WEBSOCKET-ONLY configuration for stable USB connections
+            val options = IO.Options().apply {
+                // WEBSOCKET ONLY - no polling transport at all
+                transports = arrayOf("websocket")
+                
+                // WebSocket-optimized timeouts matching server
+                timeout = 10000 // 10 seconds connection timeout
+                
+                // WebSocket-specific settings (no upgrade needed)
+                upgrade = false // Already WebSocket, no upgrade
+                rememberUpgrade = false // Not applicable
+                
+                // Heartbeat matching server configuration
+                // Note: pingInterval and pingTimeout are not available in Socket.io client options
+                // These are handled by the Socket.io client automatically
+                
+                // Manual reconnection control
+                reconnection = false // We handle reconnection manually
+                
+                // WebSocket connection settings
+                forceNew = true // Force new connection for reliability
+                multiplex = false // Disable multiplexing for stability
+                
+                // WebSocket-specific query parameters
+                query = "platform=android&version=${android.os.Build.VERSION.SDK_INT}&transport=websocket&client=android-soundboard"
+            }
+            
+            socket = IO.socket(serverUrl, options)
+            
+            setupEnhancedEventHandlers(onResult, context)
+            
+            // Connect with timing check
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastConnectionTime < minReconnectInterval) {
+                // Wait before connecting to avoid rapid reconnects
+                Handler(Looper.getMainLooper()).postDelayed({
+                    performConnection()
+                }, minReconnectInterval - (currentTime - lastConnectionTime))
+            } else {
+                performConnection()
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error setting up USB connection", e)
+            onResult(false, "Connection setup failed: ${e.message}")
+        }
+    }
+    
+    private fun setupNetworkMonitoring(context: Context) {
+        connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            networkCallback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    Log.d(TAG, "Network available: $network")
+                    val networkType = getCurrentNetworkType()
+                    if (networkType != lastNetworkType) {
+                        lastNetworkType = networkType
+                        handleNetworkChange(networkType)
+                    }
+                }
+                
+                override fun onLost(network: Network) {
+                    Log.d(TAG, "Network lost: $network")
+                    handleNetworkLost()
+                }
+                
+                override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                    Log.d(TAG, "Network capabilities changed")
+                    // Check if we switched from mobile to wifi or vice versa
+                    val newNetworkType = getCurrentNetworkType()
+                    if (newNetworkType != lastNetworkType) {
+                        lastNetworkType = newNetworkType
+                        handleNetworkChange(newNetworkType)
+                    }
+                }
+            }
+            
+            connectivityManager?.registerDefaultNetworkCallback(networkCallback!!)
+        }
+    }
+    
+    private fun getCurrentNetworkType(): NetworkType {
+        connectivityManager?.let { cm ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val activeNetwork = cm.activeNetwork ?: return NetworkType.UNKNOWN
+                val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return NetworkType.UNKNOWN
+                
+                return when {
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkType.WIFI
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkType.MOBILE
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkType.ETHERNET
+                    else -> NetworkType.UNKNOWN
+                }
+            }
+        }
+        return NetworkType.UNKNOWN
+    }
+    
+    private fun handleNetworkChange(networkType: NetworkType) {
+        Log.d(TAG, "Network changed to: $networkType")
+        
+        // If we're connected and network changed, verify connection health
+        if (isConnected() && networkType == NetworkType.ETHERNET) {
+            // Ethernet connection is preferred for USB debugging
+            Log.d(TAG, "Switched to ethernet, connection should be more stable")
+            // Reset connection attempts since we have a better connection
+            connectionAttempts = 0
+        } else if (isConnected() && networkType != NetworkType.ETHERNET) {
+            // We might have lost the USB connection
+            Log.d(TAG, "Network changed away from ethernet, may affect USB connection")
+            // Perform a quick health check
+            performConnectionHealthCheck()
+        }
+    }
+    
+    private fun handleNetworkLost() {
+        Log.d(TAG, "Network connection lost")
+        if (isConnected()) {
+            // Network lost while connected - prepare for reconnection
+            connectionAttempts = 0 // Reset attempts for better reconnection
+        }
+    }
+    
+    private fun performConnectionHealthCheck() {
+        socket?.let { s ->
+            // Send a ping to verify connection health
+            s.emit("ping", JSONObject().apply {
+                put("timestamp", System.currentTimeMillis())
+                put("type", "health_check")
+            })
+            
+            // Set a timeout to detect if the connection is actually dead
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (!s.connected()) {
+                    Log.d(TAG, "Health check failed - connection appears dead")
+                    // Trigger reconnection
+                    Log.d(TAG, "Socket is closed, attempting reconnection")
+                    s.connect()
+                }
+            }, 3000) // 3 second timeout for health check
+        }
+    }
+    
+    private fun performConnection() {
+        lastConnectionTime = System.currentTimeMillis()
+        socket?.connect()
+    }
+
+    private fun setupEnhancedEventHandlers(onResult: (Boolean, String?) -> Unit, context: Context) {
+        socket?.apply {
+            // Connection successful
+            on(Socket.EVENT_CONNECT) {
+                Log.d(TAG, "✅ Socket connected successfully via USB")
+                connectionAttempts = 0 // Reset on successful connection
+                _connectionStatus.value = ConnectionStatus.Connected()
+                
+                // Send connection metadata for server-side optimization
+                emit("client_info", JSONObject().apply {
+                    put("platform", "android")
+                    put("version", android.os.Build.VERSION.SDK_INT)
+                    put("connection_type", "usb")
+                    put("timestamp", System.currentTimeMillis())
+                })
+                
+                Handler(Looper.getMainLooper()).post {
+                    onResult(true, "Connected successfully via USB")
+                }
+            }
+            
+            // Connection failed
+            on(Socket.EVENT_CONNECT_ERROR) { args ->
+                connectionAttempts++
+                val error = if (args.isNotEmpty()) args[0].toString() else "Unknown error"
+                Log.e(TAG, "❌ Socket connection error (attempt $connectionAttempts/$maxConnectionAttempts): $error")
+                
+                _connectionStatus.value = ConnectionStatus.Error(error)
+                
+                // Enhanced error handling based on error type
+                val errorMessage = when {
+                    error.contains("timeout") -> "Connection timeout - check if server is running"
+                    error.contains("ECONNREFUSED") -> "Connection refused - server may not be accessible"
+                    error.contains("Network is unreachable") -> "Network unreachable - check USB debugging connection"
+                    connectionAttempts >= maxConnectionAttempts -> "Connection failed after $maxConnectionAttempts attempts"
+                    else -> "Connection error: $error"
+                }
+                
+                if (connectionAttempts >= maxConnectionAttempts) {
+                    Handler(Looper.getMainLooper()).post {
+                        onResult(false, errorMessage)
+                    }
+                }
+            }
+            
+            // Disconnection handling
+            on(Socket.EVENT_DISCONNECT) { args ->
+                val reason = if (args.isNotEmpty()) args[0].toString() else "Unknown reason"
+                Log.w(TAG, "⚠️ Socket disconnected: $reason")
+                _connectionStatus.value = ConnectionStatus.Disconnected
+                
+                // Handle different disconnect reasons
+                when (reason) {
+                    "io server disconnect" -> {
+                        Log.d(TAG, "Server initiated disconnect")
+                        // Don't auto-reconnect on server disconnect
+                    }
+                    "io client disconnect" -> {
+                        Log.d(TAG, "Client initiated disconnect")
+                        // Normal disconnect, don't auto-reconnect
+                    }
+                    "ping timeout" -> {
+                        Log.d(TAG, "Ping timeout - connection health issue")
+                        // Reset attempts for better reconnection chance
+                        connectionAttempts = kotlin.math.max(0, connectionAttempts - 1)
+                    }
+                    "transport close" -> {
+                        Log.d(TAG, "Transport closed - likely network issue")
+                        // This often happens with USB connection issues
+                        performConnectionHealthCheck()
+                    }
+                    "transport error" -> {
+                        Log.d(TAG, "Transport error - checking network state")
+                        // Check if USB connection is still available
+                        val networkType = getCurrentNetworkType()
+                        if (networkType != NetworkType.ETHERNET) {
+                            Log.w(TAG, "Transport error and no ethernet - USB connection may be lost")
+                        }
+                    }
+                }
+            }
+            
+            // These events are not available in Socket.io client 2.0.1
+            // Reconnection is handled manually in our implementation
+            
+            // Enhanced ping/pong handling
+            on("pong") { args ->
+                Log.d(TAG, "📡 Received pong from server")
+                if (args.isNotEmpty()) {
+                    try {
+                        val data = args[0] as JSONObject
+                        val serverTime = data.optLong("timestamp", 0)
+                        val roundTripTime = System.currentTimeMillis() - serverTime
+                        Log.d(TAG, "Connection latency: ${roundTripTime}ms")
+                        
+                        // Update connection quality based on latency
+                        _connectionStatus.value = if (roundTripTime < 100) {
+                            ConnectionStatus.Connected() // Good connection
+                        } else {
+                            ConnectionStatus.Connected(roundTripTime) // Still connected but with higher latency
+                        }
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Simple pong received")
+                    }
+                }
+            }
         }
     }
     
@@ -542,5 +823,13 @@ class SocketManager @Inject constructor() {
         
         Log.d(TAG, "🔄 Transport error #$transportErrorCount, backoff: ${backoffDelay}ms")
         return backoffDelay
+    }
+
+    fun cleanup() {
+        // Cleanup network monitoring
+        networkCallback?.let { callback ->
+            connectivityManager?.unregisterNetworkCallback(callback)
+        }
+        disconnect()
     }
 } 

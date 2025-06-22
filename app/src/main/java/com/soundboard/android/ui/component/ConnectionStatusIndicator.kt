@@ -1,10 +1,13 @@
 package com.soundboard.android.ui.component
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,13 +18,347 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.soundboard.android.network.ConnectionStatus
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EnhancedConnectionStatusIndicator(
+    connectionStatus: ConnectionStatus,
+    connectionLatency: Long? = null,
+    networkType: String? = null,
+    onRetryClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val animatedColor by animateColorAsState(
+        targetValue = when (connectionStatus) {
+            is ConnectionStatus.Connected -> MaterialTheme.colorScheme.primary
+            is ConnectionStatus.Connecting -> MaterialTheme.colorScheme.secondary
+            is ConnectionStatus.Error -> MaterialTheme.colorScheme.error
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        animationSpec = tween(durationMillis = 300)
+    )
+    
+    val pulseAnimation = rememberInfiniteTransition()
+    val pulseAlpha by pulseAnimation.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+    
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp)),
+        colors = CardDefaults.cardColors(
+            containerColor = when (connectionStatus) {
+                is ConnectionStatus.Connected -> MaterialTheme.colorScheme.primaryContainer
+                is ConnectionStatus.Connecting -> MaterialTheme.colorScheme.secondaryContainer
+                is ConnectionStatus.Error -> MaterialTheme.colorScheme.errorContainer
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Status Icon and Info
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Animated status indicator
+                Box(
+                    modifier = Modifier.size(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Pulse background for connecting status
+                    if (connectionStatus is ConnectionStatus.Connecting) {
+                        Canvas(modifier = Modifier.size(32.dp)) {
+                            drawCircle(
+                                color = animatedColor.copy(alpha = pulseAlpha * 0.3f),
+                                radius = size.minDimension / 2
+                            )
+                        }
+                    }
+                    
+                    Icon(
+                        imageVector = getConnectionIcon(connectionStatus),
+                        contentDescription = "Connection Status",
+                        tint = animatedColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = getConnectionStatusText(connectionStatus),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = when (connectionStatus) {
+                            is ConnectionStatus.Connected -> MaterialTheme.colorScheme.onPrimaryContainer
+                            is ConnectionStatus.Connecting -> MaterialTheme.colorScheme.onSecondaryContainer
+                            is ConnectionStatus.Error -> MaterialTheme.colorScheme.onErrorContainer
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    
+                    // Connection details
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Network type indicator
+                        networkType?.let { type ->
+                            Surface(
+                                color = animatedColor.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = type.uppercase(),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = animatedColor
+                                )
+                            }
+                        }
+                        
+                        // Latency indicator
+                        if (connectionStatus is ConnectionStatus.Connected && connectionLatency != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = "Latency",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = getLatencyColor(connectionLatency)
+                                )
+                                Text(
+                                    text = "${connectionLatency}ms",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = getLatencyColor(connectionLatency)
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Error message
+                    if (connectionStatus is ConnectionStatus.Error) {
+                        Text(
+                            text = connectionStatus.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            maxLines = 2
+                        )
+                    }
+                }
+            }
+            
+            // Action buttons
+            if (connectionStatus is ConnectionStatus.Error) {
+                IconButton(
+                    onClick = onRetryClick,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Retry Connection"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun getConnectionIcon(status: ConnectionStatus): ImageVector {
+    return when (status) {
+        is ConnectionStatus.Connected -> Icons.Default.CheckCircle
+        is ConnectionStatus.Connecting -> Icons.Default.Sync
+        is ConnectionStatus.Error -> Icons.Default.Error
+        else -> Icons.Default.Circle
+    }
+}
+
+private fun getConnectionStatusText(status: ConnectionStatus): String {
+    return when (status) {
+        is ConnectionStatus.Connected -> "Connected via USB"
+        is ConnectionStatus.Connecting -> "Connecting..."
+        is ConnectionStatus.Error -> "Connection Failed"
+        else -> "Disconnected"
+    }
+}
+
+@Composable
+private fun getLatencyColor(latency: Long): Color {
+    return when {
+        latency < 50 -> Color(0xFF4CAF50) // Green - Excellent
+        latency < 100 -> Color(0xFFFF9800) // Orange - Good
+        latency < 200 -> Color(0xFFF44336) // Red - Poor
+        else -> Color(0xFF9E9E9E) // Gray - Very Poor
+    }
+}
+
+// Network quality indicator with detailed metrics
+@Composable
+fun ConnectionQualityCard(
+    connectionStatus: ConnectionStatus,
+    latency: Long?,
+    packetLoss: Float?,
+    connectionDuration: Long?,
+    reconnectCount: Int?,
+    modifier: Modifier = Modifier
+) {
+    if (connectionStatus !is ConnectionStatus.Connected) return
+    
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Connection Quality",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            // Quality metrics
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    QualityMetric(
+                        label = "Latency",
+                        value = latency?.let { "${it}ms" } ?: "N/A",
+                        quality = latency?.let { getConnectionQuality(it) } ?: ConnectionQuality.UNKNOWN
+                    )
+                }
+                
+                item {
+                    QualityMetric(
+                        label = "Stability",
+                        value = packetLoss?.let { "${String.format("%.1f", it)}%" } ?: "N/A",
+                        quality = packetLoss?.let { 
+                            when {
+                                it < 1f -> ConnectionQuality.EXCELLENT
+                                it < 3f -> ConnectionQuality.GOOD
+                                it < 10f -> ConnectionQuality.FAIR
+                                else -> ConnectionQuality.POOR
+                            }
+                        } ?: ConnectionQuality.UNKNOWN
+                    )
+                }
+                
+                item {
+                    QualityMetric(
+                        label = "Uptime",
+                        value = connectionDuration?.let { formatDuration(it) } ?: "N/A",
+                        quality = ConnectionQuality.GOOD
+                    )
+                }
+                
+                reconnectCount?.let { count ->
+                    item {
+                        QualityMetric(
+                            label = "Reconnects",
+                            value = count.toString(),
+                            quality = when {
+                                count == 0 -> ConnectionQuality.EXCELLENT
+                                count < 3 -> ConnectionQuality.GOOD
+                                count < 10 -> ConnectionQuality.FAIR
+                                else -> ConnectionQuality.POOR
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+enum class ConnectionQuality {
+    EXCELLENT, GOOD, FAIR, POOR, UNKNOWN
+}
+
+@Composable
+private fun QualityMetric(
+    label: String,
+    value: String,
+    quality: ConnectionQuality
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = when (quality) {
+                ConnectionQuality.EXCELLENT -> Color(0xFF4CAF50)
+                ConnectionQuality.GOOD -> Color(0xFF8BC34A)
+                ConnectionQuality.FAIR -> Color(0xFFFF9800)
+                ConnectionQuality.POOR -> Color(0xFFF44336)
+                ConnectionQuality.UNKNOWN -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+        
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun getConnectionQuality(latency: Long): ConnectionQuality {
+    return when {
+        latency < 30 -> ConnectionQuality.EXCELLENT
+        latency < 60 -> ConnectionQuality.GOOD
+        latency < 120 -> ConnectionQuality.FAIR
+        else -> ConnectionQuality.POOR
+    }
+}
+
+private fun formatDuration(milliseconds: Long): String {
+    val seconds = milliseconds / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    
+    return when {
+        hours > 0 -> "${hours}h ${minutes % 60}m"
+        minutes > 0 -> "${minutes}m ${seconds % 60}s"
+        else -> "${seconds}s"
+    }
+}
 
 @Composable
 fun ConnectionStatusIndicator(

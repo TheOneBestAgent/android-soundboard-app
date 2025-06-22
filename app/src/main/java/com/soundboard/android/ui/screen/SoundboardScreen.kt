@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -152,71 +153,72 @@ fun SoundboardScreen(
             }
             
             // Soundboard grid
-        if (uiState.activeLayout != null) {
-            val activeLayout = uiState.activeLayout!!
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(activeLayout.gridColumns),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(
-                    items = generateGridItems(
-                        uiState.soundButtons,
-                        activeLayout.gridColumns,
-                        activeLayout.gridRows
-                    ),
-                    key = { "${it.positionX}-${it.positionY}" }
-                ) { gridItem ->
-                    SoundButtonComponent(
-                        soundButton = gridItem.soundButton,
-                        onClick = { soundButton ->
-                            if (soundButton != null) {
-                                viewModel.playSoundButton(soundButton)
-                            } else {
-                                // Empty slot clicked - add new button
-                                clickedPosition = Pair(gridItem.positionX, gridItem.positionY)
-                                showAddButtonDialog = true
-                            }
-                        },
-                        onLongClick = { soundButton ->
-                            selectedButtonForEdit = soundButton
-                        },
-                        onEdit = { soundButton ->
-                            selectedButtonForEdit = soundButton
-                        },
-                        onDelete = { soundButton ->
-                            viewModel.deleteSoundButton(soundButton)
-                        },
-                        onVolumeChange = { soundButton, volume ->
-                            viewModel.updateSoundButtonVolume(soundButton, volume)
-                        },
-                        onQuickVolumeAdjust = { soundButton, volume ->
-                            viewModel.updateSoundButtonVolume(soundButton, volume)
-                        },
-                        isEnabled = connectionStatus is ConnectionStatus.Connected,
-                        isPlaying = gridItem.soundButton?.id == uiState.currentlyPlayingButtonId,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                    )
-                }
-            }
-        } else {
-            // Loading or no layout state
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+            if (uiState.activeLayout != null) {
+                val activeLayout = uiState.activeLayout!!
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(activeLayout.gridColumns),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Loading soundboard...",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    items(
+                        items = generateGridItems(
+                            uiState.soundButtons,
+                            activeLayout.gridColumns,
+                            activeLayout.gridRows
+                        ),
+                        key = { "${it.positionX}-${it.positionY}" }
+                    ) { gridItem ->
+                        SoundButtonComponent(
+                            soundButton = gridItem.soundButton,
+                            onClick = { soundButton ->
+                                if (soundButton != null) {
+                                    viewModel.playSoundButton(soundButton)
+                                } else {
+                                    // Empty slot clicked - add new button
+                                    clickedPosition = Pair(gridItem.positionX, gridItem.positionY)
+                                    showAddButtonDialog = true
+                                }
+                            },
+                            onLongClick = { soundButton ->
+                                selectedButtonForEdit = soundButton
+                            },
+                            onEdit = { soundButton ->
+                                selectedButtonForEdit = soundButton
+                            },
+                            onDelete = { soundButton ->
+                                viewModel.deleteSoundButton(soundButton)
+                            },
+                            onVolumeChange = { soundButton, volume ->
+                                viewModel.updateSoundButtonVolume(soundButton, volume)
+                            },
+                            onQuickVolumeAdjust = { soundButton, volume ->
+                                viewModel.updateSoundButtonVolume(soundButton, volume)
+                            },
+                            isEnabled = connectionStatus is ConnectionStatus.Connected,
+                            isPlaying = gridItem.soundButton?.id == uiState.currentlyPlayingButtonId,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                        )
+                    }
+                }
+            } else {
+                // Loading or no layout state
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Loading soundboard...",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
                 }
             }
         }
@@ -241,11 +243,12 @@ fun SoundboardScreen(
     
     // USB Connection Dialog
     if (showConnectionDialog) {
+        val context = LocalContext.current
         UsbConnectionDialog(
             onDismiss = { showConnectionDialog = false },
             onConnect = {
                 // Connect via USB using localhost (ADB port forwarding)
-                                            viewModel.connectViaUSB()
+                viewModel.connectViaUSB(context)
                 showConnectionDialog = false
             },
             isConnecting = connectionStatus is ConnectionStatus.Connecting,
@@ -374,7 +377,7 @@ data class GridItem(
     val soundButton: SoundButton?
 )
 
-private fun generateGridItems(
+fun generateGridItems(
     soundButtons: List<SoundButton>,
     columns: Int,
     rows: Int
@@ -398,7 +401,7 @@ private fun generateGridItems(
     return gridItems
 }
 
-private fun findNextAvailablePosition(
+fun findNextAvailablePosition(
     soundButtons: List<SoundButton>,
     activeLayout: SoundboardLayout?
 ): Pair<Int, Int>? {
@@ -418,4 +421,4 @@ private fun findNextAvailablePosition(
     }
     
     return null
-} }
+}
