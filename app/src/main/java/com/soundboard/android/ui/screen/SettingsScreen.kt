@@ -24,9 +24,12 @@ import com.soundboard.android.ui.component.MyInstantDownloader
 import com.soundboard.android.ui.component.AppearanceSettingsDialog
 import com.soundboard.android.ui.component.DownloadLocationDialog
 import com.soundboard.android.ui.component.GridLayoutSettingsDialog
+import com.soundboard.android.ui.component.AnalyticsDashboard
 import com.soundboard.android.ui.viewmodel.SoundboardViewModel
 import com.soundboard.android.data.repository.SettingsRepository
 import com.soundboard.android.network.NetworkDiscoveryService
+import com.soundboard.android.network.MultiTransportManager
+import com.soundboard.android.network.ConnectionAnalytics
 import javax.inject.Inject
 
 data class SettingsItem(
@@ -53,6 +56,7 @@ fun SettingsScreen(
     var showUsbConnectionDialog by remember { mutableStateOf(false) }
     var showMyInstantDownloader by remember { mutableStateOf(false) }
     var showAppearanceSettings by remember { mutableStateOf(false) }
+    var showAnalyticsDashboard by remember { mutableStateOf(false) }
     var showDownloadLocationDialog by remember { mutableStateOf(false) }
     var showGridLayoutSettings by remember { mutableStateOf(false) }
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
@@ -66,10 +70,15 @@ fun SettingsScreen(
     val isDiscovering by networkDiscoveryService.discoveryState.collectAsState()
     val isDiscoveringActive = isDiscovering == NetworkDiscoveryService.DiscoveryState.DISCOVERING
     
-    // Cleanup discovery service
+    // Phase 3: Multi-Transport & Analytics
+    val connectionAnalytics = remember { ConnectionAnalytics(context) }
+    val multiTransportManager = remember { MultiTransportManager(context, connectionAnalytics) }
+    
+    // Cleanup services
     DisposableEffect(Unit) {
         onDispose {
             networkDiscoveryService.cleanup()
+            multiTransportManager.cleanup()
         }
     }
     
@@ -97,6 +106,12 @@ fun SettingsScreen(
                     subtitle = "Setup ADB connection over USB",
                     icon = Icons.Default.Usb,
                     onClick = { showUsbConnectionDialog = true }
+                ),
+                SettingsItem(
+                    title = "Analytics Dashboard",
+                    subtitle = "View connection analytics and performance metrics",
+                    icon = Icons.Default.Analytics,
+                    onClick = { showAnalyticsDashboard = true }
                 )
             )
         ),
@@ -290,6 +305,14 @@ fun SettingsScreen(
                 }
             )
         }
+    }
+    
+    if (showAnalyticsDashboard) {
+        AnalyticsDashboard(
+            multiTransportManager = multiTransportManager,
+            connectionAnalytics = connectionAnalytics,
+            onClose = { showAnalyticsDashboard = false }
+        )
     }
 }
 

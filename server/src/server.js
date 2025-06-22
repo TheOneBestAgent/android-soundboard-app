@@ -62,13 +62,21 @@ class SoundboardServer {
         this.networkDiscovery = new NetworkDiscoveryService(this.port, 'Soundboard Server');
         this.usbAutoDetection = new USBAutoDetectionService(this.adbManager, this.port);
         
-        // Legacy connection monitoring (for backward compatibility)
+        // Phase 3: Enhanced Connection Analytics
         this.startTime = Date.now();
         this.connectionStats = {
             totalConnections: 0,
             activeConnections: new Map(),
             connectionHistory: [],
-            startTime: this.startTime
+            startTime: this.startTime,
+            totalRequests: 0,
+            failedRequests: 0,
+            averageLatency: 0,
+            transportMetrics: {
+                websocket: { connections: 0, failures: 0, avgLatency: 0 },
+                http: { connections: 0, failures: 0, avgLatency: 0 },
+                usb: { connections: 0, failures: 0, avgLatency: 0 }
+            }
         };
         
         // Setup enhanced monitoring event handlers
@@ -627,7 +635,7 @@ class SoundboardServer {
             // Track with health monitor
             this.healthMonitor.trackConnection(socket.id, clientInfo);
             
-            // Update legacy connection statistics for backward compatibility
+            // Update connection statistics
             if (this.connectionStats) {
                 this.connectionStats.totalConnections++;
                 this.connectionStats.activeConnections.set(socket.id, clientInfo);
@@ -643,7 +651,7 @@ class SoundboardServer {
             socket.conn.on('upgrade', () => {
                 console.log(`🚀 Transport upgraded to: ${socket.conn.transport.name} for ${socket.id}`);
                 
-                // Update legacy stats
+                // Update transport stats
                 if (this.connectionStats) {
                     const client = this.connectionStats.activeConnections.get(socket.id);
                     if (client) {
@@ -721,7 +729,7 @@ class SoundboardServer {
                 
                 console.log(`🧠 Disconnection analysis: ${analysis.cause} (${analysis.severity} severity, ${analysis.recoverability} recoverability)`);
                 
-                // Update legacy stats
+                // Update connection stats
                 if (this.connectionStats) {
                     this.connectionStats.activeConnections.delete(socket.id);
                     console.log(`🔗 Active ${socket.conn.transport.name === 'websocket' ? 'WebSocket ' : ''}connections: ${socket.conn.transport.name === 'websocket' ? Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length : this.connectionStats.activeConnections.size}`);
