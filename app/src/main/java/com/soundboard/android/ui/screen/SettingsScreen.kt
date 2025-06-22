@@ -26,6 +26,7 @@ import com.soundboard.android.ui.component.DownloadLocationDialog
 import com.soundboard.android.ui.component.GridLayoutSettingsDialog
 import com.soundboard.android.ui.viewmodel.SoundboardViewModel
 import com.soundboard.android.data.repository.SettingsRepository
+import com.soundboard.android.network.NetworkDiscoveryService
 import javax.inject.Inject
 
 data class SettingsItem(
@@ -57,6 +58,20 @@ fun SettingsScreen(
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
     
     val downloadLocation by settingsRepository.downloadLocation.collectAsState()
+    
+    // Phase 2: Network Discovery Service
+    val context = LocalContext.current
+    val networkDiscoveryService = remember { NetworkDiscoveryService(context) }
+    val discoveredServers by networkDiscoveryService.discoveredServers.collectAsState()
+    val isDiscovering by networkDiscoveryService.discoveryState.collectAsState()
+    val isDiscoveringActive = isDiscovering == NetworkDiscoveryService.DiscoveryState.DISCOVERING
+    
+    // Cleanup discovery service
+    DisposableEffect(Unit) {
+        onDispose {
+            networkDiscoveryService.cleanup()
+        }
+    }
     
     // Helper function to format download location display
     fun formatDownloadLocation(location: String): String {
@@ -208,6 +223,19 @@ fun SettingsScreen(
             onConnect = { host, port ->
                 viewModel.connectToServer(host, port)
                 showConnectionDialog = false
+            },
+            onQRCodeScan = {
+                // TODO: Implement QR code scanning
+                snackbarMessage = "QR code scanning will be implemented in next update"
+            },
+            isConnecting = false, // TODO: Get from viewModel
+            discoveredServers = discoveredServers.values.toList(),
+            isDiscovering = isDiscoveringActive,
+            onStartDiscovery = {
+                networkDiscoveryService.startDiscovery()
+            },
+            onRefreshDiscovery = {
+                networkDiscoveryService.refreshDiscovery()
             }
         )
     }

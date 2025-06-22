@@ -357,7 +357,7 @@ class ConnectionAnalytics(private val context: Context) {
         return json.encodeToString(
             mapOf(
                 "metrics" to metrics,
-                "sessions" to sessions.takeLast(10), // Export last 10 sessions
+                "sessions" to if (sessions is List<*>) sessions.takeLast(10) else emptyList<Any>(), // Export last 10 sessions
                 "exportTime" to System.currentTimeMillis()
             )
         )
@@ -373,7 +373,7 @@ class ConnectionAnalytics(private val context: Context) {
     }
     
     private fun predictConnectionHealth(session: ConnectionSession): ConnectionHealthPrediction {
-        val recentEvents = eventQueue.takeLast(20) // Last 20 events
+        val recentEvents = eventQueue.toList().takeLast(20) // Last 20 events
         val latencyTrend = calculateLatencyTrend(recentEvents)
         val errorRate = calculateRecentErrorRate(recentEvents)
         val stabilityScore = calculateStabilityScore(session)

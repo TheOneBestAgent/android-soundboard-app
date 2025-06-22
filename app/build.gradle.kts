@@ -121,6 +121,11 @@ dependencies {
     // JSON Object for Socket.io
     implementation("org.json:json:20230618")
 
+    // Phase 2: Discovery & Automation Dependencies
+    // QR Code scanning
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.2")
+
     // Google Play Services for Google Drive backup
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0")

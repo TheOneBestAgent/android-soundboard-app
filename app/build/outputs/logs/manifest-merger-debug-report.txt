@@ -97,6 +97,7 @@ MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/Darius/.gr
 MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/Darius/.gradle/caches/8.14.2/transforms/bc3e1c5e7a01ebc9855d80ba55aa6401/transformed/startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
 MERGED from [androidx.tracing:tracing:1.0.0] /Users/Darius/.gradle/caches/8.14.2/transforms/cda3898db4d6b6d8d5ebd2ec7e67ac6a/transformed/tracing-1.0.0/AndroidManifest.xml:17:1-24:12
 MERGED from [androidx.exifinterface:exifinterface:1.3.6] /Users/Darius/.gradle/caches/8.14.2/transforms/4c67ed4379f9d2ad43bd9ecf05fa1cee/transformed/exifinterface-1.3.6/AndroidManifest.xml:17:1-24:12
+MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:17:1-56:12
 MERGED from [com.google.dagger:dagger-lint-aar:2.48] /Users/Darius/.gradle/caches/8.14.2/transforms/9c96a972f61e9385a262c9ff73fdeb27/transformed/dagger-lint-aar-2.48/AndroidManifest.xml:16:1-19:12
 	package
 		INJECTED from /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/main/AndroidManifest.xml
@@ -171,6 +172,8 @@ MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/Darius/.gr
 MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/Darius/.gradle/caches/8.14.2/transforms/2e3f739fd680f58da0509600c2d1377d/transformed/profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
 MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/Darius/.gradle/caches/8.14.2/transforms/bc3e1c5e7a01ebc9855d80ba55aa6401/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
 MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/Darius/.gradle/caches/8.14.2/transforms/bc3e1c5e7a01ebc9855d80ba55aa6401/transformed/startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:46:5-54:19
+MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:46:5-54:19
 	android:extractNativeLibs
 		INJECTED from /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/main/AndroidManifest.xml
 	android:roundIcon
@@ -413,6 +416,8 @@ MERGED from [androidx.tracing:tracing:1.0.0] /Users/Darius/.gradle/caches/8.14.2
 MERGED from [androidx.tracing:tracing:1.0.0] /Users/Darius/.gradle/caches/8.14.2/transforms/cda3898db4d6b6d8d5ebd2ec7e67ac6a/transformed/tracing-1.0.0/AndroidManifest.xml:20:5-22:41
 MERGED from [androidx.exifinterface:exifinterface:1.3.6] /Users/Darius/.gradle/caches/8.14.2/transforms/4c67ed4379f9d2ad43bd9ecf05fa1cee/transformed/exifinterface-1.3.6/AndroidManifest.xml:20:5-22:41
 MERGED from [androidx.exifinterface:exifinterface:1.3.6] /Users/Darius/.gradle/caches/8.14.2/transforms/4c67ed4379f9d2ad43bd9ecf05fa1cee/transformed/exifinterface-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:20:5-44
+MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:20:5-44
 MERGED from [com.google.dagger:dagger-lint-aar:2.48] /Users/Darius/.gradle/caches/8.14.2/transforms/9c96a972f61e9385a262c9ff73fdeb27/transformed/dagger-lint-aar-2.48/AndroidManifest.xml:18:3-42
 MERGED from [com.google.dagger:dagger-lint-aar:2.48] /Users/Darius/.gradle/caches/8.14.2/transforms/9c96a972f61e9385a262c9ff73fdeb27/transformed/dagger-lint-aar-2.48/AndroidManifest.xml:18:3-42
 	android:targetSdkVersion
@@ -565,3 +570,57 @@ action#androidx.profileinstaller.action.BENCHMARK_OPERATION
 ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/Darius/.gradle/caches/8.14.2/transforms/2e3f739fd680f58da0509600c2d1377d/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
 	android:name
 		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /Users/Darius/.gradle/caches/8.14.2/transforms/2e3f739fd680f58da0509600c2d1377d/transformed/profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+uses-permission#android.permission.CAMERA
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:22:5-65
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:22:22-62
+uses-feature#android.hardware.camera
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:25:5-27:36
+	android:required
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:27:9-33
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:26:9-47
+uses-feature#android.hardware.camera.front
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:28:5-30:36
+	android:required
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:30:9-33
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:29:9-53
+uses-feature#android.hardware.camera.autofocus
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:33:5-35:36
+	android:required
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:35:9-33
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:34:9-57
+uses-feature#android.hardware.camera.flash
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:36:5-38:36
+	android:required
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:38:9-33
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:37:9-53
+uses-feature#android.hardware.screen.landscape
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:39:5-41:36
+	android:required
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:41:9-33
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:40:9-57
+uses-feature#android.hardware.wifi
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:42:5-44:36
+	android:required
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:44:9-33
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:43:9-45
+activity#com.journeyapps.barcodescanner.CaptureActivity
+ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:47:9-53:63
+	android:screenOrientation
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:50:13-56
+	android:clearTaskOnLaunch
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:49:13-45
+	android:stateNotNeeded
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:51:13-42
+	android:windowSoftInputMode
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:53:13-60
+	android:theme
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:52:13-54
+	android:name
+		ADDED from [com.journeyapps:zxing-android-embedded:4.3.0] /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/AndroidManifest.xml:48:13-74

@@ -9,6 +9,8 @@ const VoicemeeterManager = require('./audio/VoicemeeterManager');
 const AdbManager = require('./network/AdbManager');
 const ConnectionHealthMonitor = require('./network/ConnectionHealthMonitor');
 const SmartReconnectionManager = require('./network/SmartReconnectionManager');
+const NetworkDiscoveryService = require('./network/NetworkDiscoveryService');
+const USBAutoDetectionService = require('./network/USBAutoDetectionService');
 const { Server } = require('socket.io');
 
 class SoundboardServer {
@@ -16,34 +18,33 @@ class SoundboardServer {
         this.app = express();
         this.server = http.createServer(this.app);
         
-        // Configure Socket.io for WEBSOCKET-ONLY communication
+        // Configure Socket.io for enhanced connection management
         this.io = new Server(this.server, {
             cors: {
                 origin: "*",
                 methods: ["GET", "POST"]
             },
-            // WEBSOCKET ONLY - no polling transport
-            transports: ['websocket'],
-            // Optimized timeouts for WebSocket-only
+            // Allow both polling and websocket transports for compatibility
+            transports: ['polling', 'websocket'],
+            // Balanced timeouts for stability
             pingTimeout: 30000,   // 30 seconds
             pingInterval: 15000,  // 15 seconds
-            // WebSocket-specific optimizations
-            upgradeTimeout: 3000, // Short timeout since no upgrade needed
-            maxHttpBufferSize: 1e6, // 1MB buffer
-            // Disable features not needed for WebSocket-only
-            allowEIO3: false,
+            // Connection optimizations
+            upgradeTimeout: 10000, // 10 seconds for transport upgrade
+            maxHttpBufferSize: 50e6, // 50MB buffer for audio uploads
+            // Enhanced connection features
+            allowEIO3: true,
             serveClient: false,
-            connectionStateRecovery: false,
-            httpCompression: false,
-            perMessageDeflate: false,
-            // WebSocket-specific validation
-            allowRequest: (req, callback) => {
-                // Only allow WebSocket connections
-                const isWebSocket = req.headers.upgrade === 'websocket';
-                if (!isWebSocket) {
-                    console.log('❌ Rejected non-WebSocket connection');
-                }
-                callback(null, isWebSocket);
+            connectionStateRecovery: {
+                maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+                skipMiddlewares: true,
+            },
+            // Compression for better performance
+            httpCompression: true,
+            perMessageDeflate: {
+                threshold: 1024,
+                concurrencyLimit: 10,
+                // Use defaults for other options
             }
         });
         
@@ -56,6 +57,10 @@ class SoundboardServer {
         // Enhanced connection monitoring system
         this.healthMonitor = new ConnectionHealthMonitor();
         this.reconnectionManager = new SmartReconnectionManager();
+        
+        // Phase 2: Discovery & Automation services
+        this.networkDiscovery = new NetworkDiscoveryService(this.port, 'Soundboard Server');
+        this.usbAutoDetection = new USBAutoDetectionService(this.adbManager, this.port);
         
         // Legacy connection monitoring (for backward compatibility)
         this.startTime = Date.now();
@@ -121,7 +126,45 @@ class SoundboardServer {
             });
         });
         
-        console.log('🔧 Enhanced connection monitoring initialized');
+        // Phase 2: Setup Discovery & Automation services
+        this.setupPhase2Services();
+        
+        console.log('🔧 Enhanced connection monitoring and Phase 2 services initialized');
+    }
+    
+    setupPhase2Services() {
+        // Network Discovery Service events
+        this.networkDiscovery.on('serviceAdvertised', (serviceInfo) => {
+            console.log('📡 mDNS service advertised:', serviceInfo);
+        });
+        
+        this.networkDiscovery.on('serviceDiscovered', (service) => {
+            console.log('🔍 Discovered soundboard service:', service.name);
+        });
+        
+        this.networkDiscovery.on('qrCodeGenerated', (qrInfo) => {
+            console.log('📱 QR code generated for pairing');
+        });
+        
+        // USB Auto-Detection Service events
+        this.usbAutoDetection.on('deviceConnected', (device) => {
+            console.log(`🔌 USB device auto-detected: ${device.id}`);
+        });
+        
+        this.usbAutoDetection.on('portForwardingEstablished', (info) => {
+            console.log(`✅ Auto port forwarding: ${info.device.id} → :${info.port}`);
+        });
+        
+        this.usbAutoDetection.on('deviceRequiresAuthorization', (device) => {
+            console.log(`🔐 Device ${device.id} needs USB debugging authorization`);
+        });
+        
+        // Start Phase 2 services
+        this.networkDiscovery.startAdvertisement();
+        this.networkDiscovery.startDiscovery();
+        this.usbAutoDetection.startMonitoring();
+        
+        console.log('🚀 Phase 2 Discovery & Automation services started');
     }
     
     getConnectionHistory(socketId) {
@@ -170,13 +213,14 @@ class SoundboardServer {
         // Health check endpoint
         this.app.get('/health', (req, res) => {
             const uptime = Date.now() - this.startTime;
+            const globalAnalytics = this.healthMonitor.getGlobalAnalytics();
             const healthStatus = {
                 status: 'healthy',
                 uptime: uptime,
                 connections: {
-                    total: this.connectionStats.totalConnections,
-                    active: this.connectionStats.activeConnections.size,
-                    history: this.connectionStats.connectionHistory.slice(-10) // Last 10 connections
+                    total: globalAnalytics.totalConnections,
+                    active: globalAnalytics.activeConnections,
+                    history: globalAnalytics.connectionHistory.slice(-10) // Last 10 connections
                 },
                 server: {
                     memory: process.memoryUsage(),
@@ -206,7 +250,12 @@ class SoundboardServer {
                     voicemeeter_volume_recommendations: '/voicemeeter/volume-recommendations',
                     connection_analytics: '/analytics/connections',
                     global_analytics: '/analytics/global',
-                    reconnection_stats: '/analytics/reconnection'
+                    reconnection_stats: '/analytics/reconnection',
+                    // Phase 2: Discovery & Automation endpoints
+                    network_discovery: '/discovery/network',
+                    qr_pairing: '/discovery/qr-code',
+                    usb_status: '/discovery/usb',
+                    connection_recommendations: '/discovery/recommendations'
                 }
             });
         });
@@ -478,6 +527,84 @@ class SoundboardServer {
             const reconnectionStats = this.reconnectionManager.getGlobalStats();
             res.json(reconnectionStats);
         });
+
+        // Phase 2: Discovery & Automation Endpoints
+        this.app.get('/discovery/network', (req, res) => {
+            const networkStatus = this.networkDiscovery.getStatus();
+            const topology = this.networkDiscovery.getNetworkTopology();
+            
+            res.json({
+                status: networkStatus,
+                topology: topology,
+                timestamp: new Date().toISOString()
+            });
+        });
+
+        this.app.get('/discovery/qr-code', async (req, res) => {
+            try {
+                const options = {
+                    size: parseInt(req.query.size) || 256,
+                    expiryHours: parseInt(req.query.expiryHours) || 24
+                };
+                
+                const qrCodeInfo = await this.networkDiscovery.generatePairingQRCode(options);
+                
+                res.json({
+                    qrCode: qrCodeInfo.dataURL,
+                    svg: qrCodeInfo.svg,
+                    connectionData: qrCodeInfo.connectionData,
+                    metadata: qrCodeInfo.metadata
+                });
+            } catch (error) {
+                console.error('❌ QR code generation error:', error);
+                res.status(500).json({
+                    error: 'Failed to generate QR code',
+                    message: error.message
+                });
+            }
+        });
+
+        this.app.get('/discovery/usb', (req, res) => {
+            const usbStatus = this.usbAutoDetection.getConnectionStatus();
+            res.json(usbStatus);
+        });
+
+        this.app.post('/discovery/usb/scan', async (req, res) => {
+            try {
+                const status = await this.usbAutoDetection.forceScan();
+                res.json({
+                    message: 'USB scan completed',
+                    status: status
+                });
+            } catch (error) {
+                console.error('❌ USB scan error:', error);
+                res.status(500).json({
+                    error: 'USB scan failed',
+                    message: error.message
+                });
+            }
+        });
+
+        this.app.get('/discovery/recommendations', (req, res) => {
+            const clientInfo = {
+                address: req.ip || req.connection.remoteAddress,
+                platform: req.query.platform || 'unknown',
+                usbDebugging: req.query.usbDebugging === 'true',
+                connectionType: req.query.connectionType || 'unknown'
+            };
+            
+            const recommendations = this.networkDiscovery.recommendConnectionMethod(clientInfo);
+            res.json(recommendations);
+        });
+
+        this.app.get('/discovery/services', (req, res) => {
+            const discoveredServices = Array.from(this.networkDiscovery.discoveredServices.values());
+            res.json({
+                services: discoveredServices,
+                count: discoveredServices.length,
+                lastScan: new Date().toISOString()
+            });
+        });
     }
     
     setupSocketHandlers() {
@@ -501,8 +628,10 @@ class SoundboardServer {
             this.healthMonitor.trackConnection(socket.id, clientInfo);
             
             // Update legacy connection statistics for backward compatibility
-            this.connectionStats.totalConnections++;
-            this.connectionStats.activeConnections.set(socket.id, clientInfo);
+            if (this.connectionStats) {
+                this.connectionStats.totalConnections++;
+                this.connectionStats.activeConnections.set(socket.id, clientInfo);
+            }
             
             // Log initial transport and let Socket.io handle upgrades automatically
             console.log(`🔍 Initial transport: ${socket.conn.transport.name} for ${socket.id}`);
@@ -515,10 +644,12 @@ class SoundboardServer {
                 console.log(`🚀 Transport upgraded to: ${socket.conn.transport.name} for ${socket.id}`);
                 
                 // Update legacy stats
-                const client = this.connectionStats.activeConnections.get(socket.id);
-                if (client) {
-                    client.transport = socket.conn.transport.name;
-                    this.connectionStats.activeConnections.set(socket.id, client);
+                if (this.connectionStats) {
+                    const client = this.connectionStats.activeConnections.get(socket.id);
+                    if (client) {
+                        client.transport = socket.conn.transport.name;
+                        this.connectionStats.activeConnections.set(socket.id, client);
+                    }
                 }
                 
                 // Track with health monitor
@@ -530,10 +661,12 @@ class SoundboardServer {
             });
             
             // Log active connections based on transport type
-            if (socket.conn.transport.name === 'websocket') {
-                console.log(`🔗 Active WebSocket connections: ${Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length}`);
-            } else {
-                console.log(`🔗 Active connections: ${this.connectionStats.activeConnections.size}`);
+            if (this.connectionStats) {
+                if (socket.conn.transport.name === 'websocket') {
+                    console.log(`🔗 Active WebSocket connections: ${Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length}`);
+                } else {
+                    console.log(`🔗 Active connections: ${this.connectionStats.activeConnections.size}`);
+                }
             }
             
             // Enhanced WebSocket ping/pong handling with latency tracking
@@ -562,10 +695,12 @@ class SoundboardServer {
             // Handle client info updates
             socket.on('client_info', (data) => {
                 console.log(`📋 Client info from ${socket.id}:`, data);
-                const client = this.connectionStats.activeConnections.get(socket.id);
-                if (client) {
-                    Object.assign(client, data);
-                    this.connectionStats.activeConnections.set(socket.id, client);
+                if (this.connectionStats) {
+                    const client = this.connectionStats.activeConnections.get(socket.id);
+                    if (client) {
+                        Object.assign(client, data);
+                        this.connectionStats.activeConnections.set(socket.id, client);
+                    }
                 }
             });
             
@@ -587,8 +722,10 @@ class SoundboardServer {
                 console.log(`🧠 Disconnection analysis: ${analysis.cause} (${analysis.severity} severity, ${analysis.recoverability} recoverability)`);
                 
                 // Update legacy stats
-                this.connectionStats.activeConnections.delete(socket.id);
-                console.log(`🔗 Active ${socket.conn.transport.name === 'websocket' ? 'WebSocket ' : ''}connections: ${socket.conn.transport.name === 'websocket' ? Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length : this.connectionStats.activeConnections.size}`);
+                if (this.connectionStats) {
+                    this.connectionStats.activeConnections.delete(socket.id);
+                    console.log(`🔗 Active ${socket.conn.transport.name === 'websocket' ? 'WebSocket ' : ''}connections: ${socket.conn.transport.name === 'websocket' ? Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length : this.connectionStats.activeConnections.size}`);
+                }
             });
             
             // Enhanced error handling with detailed tracking
@@ -784,6 +921,17 @@ process.on('SIGINT', async () => {
     if (server.adbManager) {
         console.log('Stopping device monitoring...');
         server.adbManager.stopDeviceMonitoring();
+    }
+    
+    // Phase 2: Clean up Discovery & Automation services
+    if (server.networkDiscovery) {
+        console.log('Shutting down network discovery service...');
+        server.networkDiscovery.shutdown();
+    }
+    
+    if (server.usbAutoDetection) {
+        console.log('Shutting down USB auto-detection service...');
+        server.usbAutoDetection.shutdown();
     }
     
     // Clean up Voicemeeter

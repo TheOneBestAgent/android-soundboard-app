@@ -53,19 +53,20 @@ com.soundboard.android.app-hilt-navigation-1.1.0-51 /Users/Darius/.gradle/caches
 com.soundboard.android.app-lifecycle-process-2.7.0-52 /Users/Darius/.gradle/caches/8.14.2/transforms/c8e43cc05bd01755c1c24afd5a047601/transformed/lifecycle-process-2.7.0/res
 com.soundboard.android.app-play-services-auth-20.7.0-53 /Users/Darius/.gradle/caches/8.14.2/transforms/cbf1400e3e65a7b3b7174dc853bf53fd/transformed/play-services-auth-20.7.0/res
 com.soundboard.android.app-ui-tooling-release-54 /Users/Darius/.gradle/caches/8.14.2/transforms/d1769877227cdfe704f80dec18311ac1/transformed/ui-tooling-release/res
-com.soundboard.android.app-room-runtime-2.6.0-55 /Users/Darius/.gradle/caches/8.14.2/transforms/d2c156c285092e2de33cf7e3493d8dd5/transformed/room-runtime-2.6.0/res
-com.soundboard.android.app-lifecycle-runtime-2.7.0-56 /Users/Darius/.gradle/caches/8.14.2/transforms/d35b817785ea419f8e77ceb70fa5567e/transformed/lifecycle-runtime-2.7.0/res
-com.soundboard.android.app-savedstate-ktx-1.2.1-57 /Users/Darius/.gradle/caches/8.14.2/transforms/d9810dae6da2bd0626dcb23583670cf2/transformed/savedstate-ktx-1.2.1/res
-com.soundboard.android.app-material-release-58 /Users/Darius/.gradle/caches/8.14.2/transforms/db9df9adb1433dc573c1d3d0851db533/transformed/material-release/res
-com.soundboard.android.app-ui-geometry-release-59 /Users/Darius/.gradle/caches/8.14.2/transforms/df6ee37beda289d9b4019a5d0e996748/transformed/ui-geometry-release/res
-com.soundboard.android.app-appcompat-resources-1.6.1-60 /Users/Darius/.gradle/caches/8.14.2/transforms/f353d1d0afa2a56dc81ad6db06b346ca/transformed/appcompat-resources-1.6.1/res
-com.soundboard.android.app-core-runtime-2.2.0-61 /Users/Darius/.gradle/caches/8.14.2/transforms/f647e439b61d180ed16700f54b7fbb5b/transformed/core-runtime-2.2.0/res
-com.soundboard.android.app-lifecycle-viewmodel-savedstate-2.7.0-62 /Users/Darius/.gradle/caches/8.14.2/transforms/f8eb8921727bb9a8f2727605456eb813/transformed/lifecycle-viewmodel-savedstate-2.7.0/res
-com.soundboard.android.app-ui-test-manifest-1.5.4-63 /Users/Darius/.gradle/caches/8.14.2/transforms/fb5c45f8886a6539bded8c17384bcff6/transformed/ui-test-manifest-1.5.4/res
-com.soundboard.android.app-navigation-compose-2.7.4-64 /Users/Darius/.gradle/caches/8.14.2/transforms/ff3c89a483fa3798d85ce5881a588367/transformed/navigation-compose-2.7.4/res
-com.soundboard.android.app-resValues-65 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/generated/res/resValues/debug
-com.soundboard.android.app-packageDebugResources-66 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
-com.soundboard.android.app-packageDebugResources-67 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
-com.soundboard.android.app-debug-68 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/merged_res/debug/mergeDebugResources
-com.soundboard.android.app-debug-69 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/debug/res
-com.soundboard.android.app-main-70 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/main/res
+com.soundboard.android.app-zxing-android-embedded-4.3.0-55 /Users/Darius/.gradle/caches/8.14.2/transforms/d214f76e0d83a133188d7cd45bdcd768/transformed/zxing-android-embedded-4.3.0/res
+com.soundboard.android.app-room-runtime-2.6.0-56 /Users/Darius/.gradle/caches/8.14.2/transforms/d2c156c285092e2de33cf7e3493d8dd5/transformed/room-runtime-2.6.0/res
+com.soundboard.android.app-lifecycle-runtime-2.7.0-57 /Users/Darius/.gradle/caches/8.14.2/transforms/d35b817785ea419f8e77ceb70fa5567e/transformed/lifecycle-runtime-2.7.0/res
+com.soundboard.android.app-savedstate-ktx-1.2.1-58 /Users/Darius/.gradle/caches/8.14.2/transforms/d9810dae6da2bd0626dcb23583670cf2/transformed/savedstate-ktx-1.2.1/res
+com.soundboard.android.app-material-release-59 /Users/Darius/.gradle/caches/8.14.2/transforms/db9df9adb1433dc573c1d3d0851db533/transformed/material-release/res
+com.soundboard.android.app-ui-geometry-release-60 /Users/Darius/.gradle/caches/8.14.2/transforms/df6ee37beda289d9b4019a5d0e996748/transformed/ui-geometry-release/res
+com.soundboard.android.app-appcompat-resources-1.6.1-61 /Users/Darius/.gradle/caches/8.14.2/transforms/f353d1d0afa2a56dc81ad6db06b346ca/transformed/appcompat-resources-1.6.1/res
+com.soundboard.android.app-core-runtime-2.2.0-62 /Users/Darius/.gradle/caches/8.14.2/transforms/f647e439b61d180ed16700f54b7fbb5b/transformed/core-runtime-2.2.0/res
+com.soundboard.android.app-lifecycle-viewmodel-savedstate-2.7.0-63 /Users/Darius/.gradle/caches/8.14.2/transforms/f8eb8921727bb9a8f2727605456eb813/transformed/lifecycle-viewmodel-savedstate-2.7.0/res
+com.soundboard.android.app-ui-test-manifest-1.5.4-64 /Users/Darius/.gradle/caches/8.14.2/transforms/fb5c45f8886a6539bded8c17384bcff6/transformed/ui-test-manifest-1.5.4/res
+com.soundboard.android.app-navigation-compose-2.7.4-65 /Users/Darius/.gradle/caches/8.14.2/transforms/ff3c89a483fa3798d85ce5881a588367/transformed/navigation-compose-2.7.4/res
+com.soundboard.android.app-resValues-66 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/generated/res/resValues/debug
+com.soundboard.android.app-packageDebugResources-67 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.soundboard.android.app-packageDebugResources-68 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.soundboard.android.app-debug-69 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.soundboard.android.app-debug-70 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/debug/res
+com.soundboard.android.app-main-71 /Users/Darius/Documents/GitHub/Android APP - Soundboard/app/src/main/res
