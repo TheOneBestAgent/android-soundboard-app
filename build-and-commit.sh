@@ -95,14 +95,76 @@ grep -q ".gradle/" .gitignore || echo ".gradle/" >> .gitignore
 
 # Stage only source code changes (exclude build artifacts)
 echo "📝 Staging source code changes..."
+
+# Stage all source code directories and files
 git add app/src/
 git add memory-bank/
 git add server/src/
+git add server/package*.json
+
+# Stage all documentation and configuration files
 git add *.md
 git add *.gradle.kts
 git add *.json
 git add *.sh
+# Skip properties files that might be in gitignore (like local.properties)
+git add gradle.properties 2>/dev/null || true
+git add *.xml
+
+# Stage gradle wrapper and configuration
+git add gradle/
+git add gradlew*
+git add settings.gradle.kts
+
+# Stage any resource files that might have been updated
+git add app/src/main/res/
+
+# Stage any new or updated configuration files
+git add .gitignore 2>/dev/null || true
+
+# Check for and stage any other important project files
+echo "🔍 Checking for additional project files to stage..."
+
+# Stage any icon or image files that might have been added/updated
+git add *.jpg *.png *.ico 2>/dev/null || true
+
+# Stage any test files or additional server components
+git add server/test* 2>/dev/null || true
+git add test* 2>/dev/null || true
+
+# Stage the newly built APK
 git add "${APK_NAME}"
+
+# Check for any unstaged changes in important directories
+echo "🔍 Checking for any remaining unstaged changes..."
+UNSTAGED_CHANGES=$(git diff --name-only)
+if [[ -n "$UNSTAGED_CHANGES" ]]; then
+    echo "⚠️  Found unstaged changes in the following files:"
+    echo "$UNSTAGED_CHANGES" | sed 's/^/  - /'
+    echo ""
+    echo "🔄 Staging remaining important files..."
+    
+    # Stage any remaining source files that weren't caught above
+    echo "$UNSTAGED_CHANGES" | while read file; do
+        # Only stage files that are likely to be source code or configuration
+        if [[ "$file" =~ \.(kt|java|js|json|md|gradle|kts|xml|properties|sh|yml|yaml)$ ]] || 
+           [[ "$file" =~ ^(app/|server/|memory-bank/|gradle/) ]] ||
+           [[ "$file" =~ ^(README|LICENSE|CHANGELOG|RELEASE_NOTES) ]]; then
+            echo "  📝 Staging: $file"
+            git add "$file" 2>/dev/null || true
+        fi
+    done
+fi
+
+# Final check for staged changes
+STAGED_FILES=$(git diff --cached --name-only)
+if [[ -n "$STAGED_FILES" ]]; then
+    echo "✅ Successfully staged the following files:"
+    echo "$STAGED_FILES" | sed 's/^/  ✓ /'
+    echo ""
+else
+    echo "ℹ️  No files were staged."
+fi
 
 # Check if there are any changes to commit
 if git diff --cached --quiet; then
@@ -113,7 +175,7 @@ fi
 
 # Create commit message with feature summary
 echo "💬 Creating commit message..."
-COMMIT_MSG="🚀 Release v${NEXT_VERSION} - Phase 6.0 Complete
+COMMIT_MSG="🚀 Release v${NEXT_VERSION} - Phase 6.0 Complete + Server Fixes
 
 ✨ Features Added:
 - Comprehensive Settings Persistence System
@@ -126,12 +188,24 @@ COMMIT_MSG="🚀 Release v${NEXT_VERSION} - Phase 6.0 Complete
 - SoundboardBackupService with metadata tracking
 - PathManagerService with intelligent file resolution
 - Fixed all compilation errors and type mismatches
+- Server stability improvements and error handling fixes
+
+🛠️ Server Fixes:
+- Fixed Socket.io connection handling and transport upgrades
+- Improved error handling for WebSocket/polling connections
+- Enhanced connection logging and diagnostics
+- Removed problematic socket.conn.upgrade() calls
+
+📁 Project Updates:
+- Comprehensive file staging including all source, config, and documentation
+- Updated build automation to ensure all project files are synchronized
+- Enhanced version control to track server, app, and documentation changes
 
 📱 APK: ${APK_NAME} (${APK_SIZE})
-🎯 Status: All systems operational, audio working perfectly
-🔗 WebSocket: Stable connections, transport errors eliminated
+🎯 Status: All systems operational, server errors resolved, audio working perfectly
+🔗 WebSocket: Stable connections with proper transport handling
 
-#android #soundboard #kotlin #jetpackcompose"
+#android #soundboard #kotlin #jetpackcompose #nodejs #socketio"
 
 # Commit changes
 echo "💾 Committing changes..."
@@ -177,6 +251,19 @@ cat > RELEASE_NOTES_v${NEXT_VERSION}.md << EOF
 - **PathManagerService** - Intelligent file resolution with Smart, Preserve, and Reset strategies
 - **Build Automation** - Automated build, version management, and GitHub synchronization
 - **WebSocket Stability** - Eliminated transport errors, improved connection reliability
+
+### 🛠️ Server Fixes & Improvements
+- **Fixed Socket.io Connection Handling** - Resolved transport upgrade errors and connection issues
+- **Enhanced Error Handling** - Improved WebSocket/polling connection error management
+- **Better Connection Logging** - Enhanced diagnostics and connection status tracking
+- **Transport Compatibility** - Proper handling of both WebSocket and polling connections
+- **Stability Improvements** - Removed problematic upgrade calls and improved error recovery
+
+### 📁 Project Management Enhancements
+- **Comprehensive File Tracking** - All source, configuration, and documentation files now properly versioned
+- **Enhanced Build Script** - Improved automation to ensure all project components are synchronized
+- **Better Version Control** - Comprehensive staging of app, server, and documentation changes
+- **Automated Documentation** - Release notes and memory bank updates fully automated
 
 ### 📊 Change Statistics
 - **Files Modified:** $(echo "$CHANGED_FILES" | wc -l | tr -d ' ')

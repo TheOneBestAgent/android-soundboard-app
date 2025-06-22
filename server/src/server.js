@@ -367,16 +367,11 @@ class SoundboardServer {
     }
     
     setupSocketHandlers() {
+        // Handle both polling and WebSocket connections
         this.io.on('connection', (socket) => {
-            // WebSocket-only connection handling
-            console.log(`🌐 WebSocket connected: ${socket.id}`);
+            console.log(`✅ Client connected: ${socket.id}`);
             console.log(`   🚀 Transport: ${socket.conn.transport.name}`);
             console.log(`   📍 Address: ${socket.handshake.address}`);
-            
-            // Verify it's actually WebSocket
-            if (socket.conn.transport.name !== 'websocket') {
-                console.warn(`⚠️  Expected WebSocket, got: ${socket.conn.transport.name}`);
-            }
             
             // Update connection statistics
             this.connectionStats.totalConnections++;
@@ -388,11 +383,32 @@ class SoundboardServer {
             };
             this.connectionStats.activeConnections.set(socket.id, clientInfo);
             
-            console.log(`🔗 Active WebSocket connections: ${this.connectionStats.activeConnections.size}`);
+            // Log initial transport and let Socket.io handle upgrades automatically
+            console.log(`🔍 Initial transport: ${socket.conn.transport.name} for ${socket.id}`);
+            if (socket.handshake.address === '127.0.0.1' || socket.handshake.address === '::1') {
+                console.log(`🏠 Localhost connection detected - WebSocket upgrade will happen automatically if supported`);
+            }
+            
+            // Handle transport upgrades
+            socket.conn.on('upgrade', () => {
+                console.log(`🚀 Transport upgraded to: ${socket.conn.transport.name} for ${socket.id}`);
+                const client = this.connectionStats.activeConnections.get(socket.id);
+                if (client) {
+                    client.transport = socket.conn.transport.name;
+                    this.connectionStats.activeConnections.set(socket.id, client);
+                }
+            });
+            
+            // Log active connections based on transport type
+            if (socket.conn.transport.name === 'websocket') {
+                console.log(`🔗 Active WebSocket connections: ${Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length}`);
+            } else {
+                console.log(`🔗 Active connections: ${this.connectionStats.activeConnections.size}`);
+            }
             
             // WebSocket ping/pong handling
             socket.on('ping', (data) => {
-                console.log(`🏓 WebSocket ping from ${socket.id}`);
+                console.log(`🏓 ${socket.conn.transport.name === 'websocket' ? 'WebSocket' : 'Polling'} ping from ${socket.id}`);
                 socket.emit('pong', { 
                     timestamp: Date.now(),
                     serverUptime: Date.now() - this.startTime
@@ -415,22 +431,22 @@ class SoundboardServer {
                 }
             });
             
-            // WebSocket disconnection handling
+            // Connection disconnection handling
             socket.on('disconnect', (reason) => {
-                console.log(`❌ WebSocket disconnected: ${socket.id}, reason: ${reason}`);
+                console.log(`❌ ${socket.conn.transport.name === 'websocket' ? 'WebSocket' : 'Client'} disconnected: ${socket.id}, reason: ${reason}`);
                 this.connectionStats.activeConnections.delete(socket.id);
-                console.log(`🔗 Active WebSocket connections: ${this.connectionStats.activeConnections.size}`);
+                console.log(`🔗 Active ${socket.conn.transport.name === 'websocket' ? 'WebSocket ' : ''}connections: ${socket.conn.transport.name === 'websocket' ? Array.from(this.connectionStats.activeConnections.values()).filter(c => c.transport === 'websocket').length : this.connectionStats.activeConnections.size}`);
             });
             
             // Error handling
             socket.on('error', (error) => {
-                console.error(`❌ WebSocket error for ${socket.id}:`, error);
+                console.error(`❌ ${socket.conn.transport.name === 'websocket' ? 'WebSocket' : 'Socket'} error for ${socket.id}:`, error);
             });
 
             // Send initial connection confirmation
             socket.emit('server_status', {
                 connected: true,
-                transport: 'websocket',
+                transport: socket.conn.transport.name,
                 serverTime: new Date().toISOString(),
                 capabilities: ['audio_forward', 'file_upload', 'ping_pong'],
                 uptime: Date.now() - this.startTime

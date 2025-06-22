@@ -46,6 +46,8 @@ public final class SoundboardLayoutDao_Impl implements SoundboardLayoutDao {
 
   private final EntityDeletionOrUpdateAdapter<SoundboardLayout> __updateAdapterOfSoundboardLayout;
 
+  private final SharedSQLiteStatement __preparedStmtOfDeleteAllLayouts;
+
   private final SharedSQLiteStatement __preparedStmtOfDeactivateAllLayouts;
 
   private final SharedSQLiteStatement __preparedStmtOfSetActiveLayout;
@@ -180,6 +182,14 @@ public final class SoundboardLayoutDao_Impl implements SoundboardLayoutDao {
         statement.bindLong(22, entity.getId());
       }
     };
+    this.__preparedStmtOfDeleteAllLayouts = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "DELETE FROM soundboard_layouts";
+        return _query;
+      }
+    };
     this.__preparedStmtOfDeactivateAllLayouts = new SharedSQLiteStatement(__db) {
       @Override
       @NonNull
@@ -258,6 +268,29 @@ public final class SoundboardLayoutDao_Impl implements SoundboardLayoutDao {
   @Override
   public Object switchActiveLayout(final long id, final Continuation<? super Unit> $completion) {
     return RoomDatabaseKt.withTransaction(__db, (__cont) -> SoundboardLayoutDao.DefaultImpls.switchActiveLayout(SoundboardLayoutDao_Impl.this, id, __cont), $completion);
+  }
+
+  @Override
+  public Object deleteAllLayouts(final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfDeleteAllLayouts.acquire();
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfDeleteAllLayouts.release(_stmt);
+        }
+      }
+    }, $completion);
   }
 
   @Override
