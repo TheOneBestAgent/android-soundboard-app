@@ -190,13 +190,12 @@ class CacheManager @Inject constructor() {
                     // Update access statistics
                     updateAccessPattern(key)
                     // Update entry in cache with new statistics
-                    @Suppress("UNCHECKED_CAST") 
-                    val anyEntry = entry as CacheEntry<Any>
-                    val updatedEntry = anyEntry.copy(
+                    // Update entry access statistics
+                    @Suppress("UNCHECKED_CAST")
+                    cache[key] = (entry as CacheEntry<Any>).copy(
                         lastAccessedTimestamp = System.currentTimeMillis(),
-                        accessCount = anyEntry.accessCount + 1
+                        accessCount = entry.accessCount + 1
                     )
-                    cache[key] = updatedEntry
                     
                     cacheHits.incrementAndGet()
                     @Suppress("UNCHECKED_CAST")

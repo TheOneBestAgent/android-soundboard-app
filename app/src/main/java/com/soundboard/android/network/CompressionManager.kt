@@ -265,7 +265,7 @@ class CompressionManager @Inject constructor() {
         scope.launch {
             compressionMutex.withLock {
                 val currentTime = System.currentTimeMillis()
-                networkSpeedHistory.offer(Pair<Long, Double>(currentTime, bandwidthMbps))
+                networkSpeedHistory.offer(currentTime to bandwidthMbps)
                 
                 // Remove old entries
                 val cutoffTime = currentTime - NETWORK_SPEED_WINDOW_MS
