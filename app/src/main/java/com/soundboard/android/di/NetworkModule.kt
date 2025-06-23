@@ -3,6 +3,8 @@ package com.soundboard.android.di
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.soundboard.android.network.SocketManager
+import com.soundboard.android.network.DeviceSessionManager
+import com.soundboard.android.network.SessionCoordinator
 import com.soundboard.android.network.api.SoundboardApiService
 import com.soundboard.android.network.api.MyInstantApiService
 import dagger.Module
@@ -86,6 +88,22 @@ object NetworkModule {
     @Singleton
     fun provideMyInstantApiService(@Named("myinstant") retrofit: Retrofit): MyInstantApiService {
         return retrofit.create(MyInstantApiService::class.java)
+    }
+    
+    // Phase 4.1: Multi-Device Support Dependencies
+    @Provides
+    @Singleton
+    fun provideDeviceSessionManager(): DeviceSessionManager {
+        return DeviceSessionManager()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideSessionCoordinator(
+        deviceSessionManager: DeviceSessionManager,
+        gson: Gson
+    ): SessionCoordinator {
+        return SessionCoordinator(deviceSessionManager, gson)
     }
 }
 
