@@ -843,4 +843,74 @@ class DiagnosticsManager @Inject constructor(
         listOf("Health and performance are positively correlated")
     private fun generateCorrelationRecommendations(health: HealthScore, performance: PerformanceAnalysis): List<String> = 
         listOf("Continue current optimization strategies")
+
+    // =============================================================================
+    // MISSING METHODS FOR EXTERNAL API
+    // =============================================================================
+
+    /**
+     * Get current health score as Flow for reactive monitoring
+     */
+    fun getCurrentHealthScore(): Flow<HealthScore> = healthScore.asStateFlow()
+
+    /**
+     * Get component health status as Flow for reactive monitoring
+     */
+    fun getComponentHealth(): Flow<Map<ComponentType, ComponentHealth>> = flow {
+        val health = _currentHealth.value
+        emit(health.components)
+    }
+
+    /**
+     * Get active bottlenecks as Flow for reactive monitoring
+     */
+    fun getActiveBottlenecks(): Flow<List<Bottleneck>> = flow {
+        emit(analyzeBottlenecks())
+    }
+
+    /**
+     * Perform comprehensive health check and return detailed results
+     */
+    suspend fun performHealthCheck(): DiagnosticReport {
+        val health = performComprehensiveHealthCheck()
+        return DiagnosticReport(
+            timestamp = System.currentTimeMillis(),
+            healthScore = health.overallScore,
+            componentHealth = health.components,
+            bottlenecks = analyzeBottlenecks(),
+            resourceUsage = getCurrentResourceUsage(),
+            recommendations = generateRecommendations(health.overallScore, analyzeBottlenecks(), getCurrentResourceUsage()),
+            systemInfo = getSystemInfo()
+        )
+    }
+
+    /**
+     * Analyze current bottlenecks and return results
+     */
+    suspend fun analyzeBottlenecks(): List<Bottleneck> {
+        return analyzeResourceBottlenecks() + analyzeTrendBottlenecks()
+    }
+
+    /**
+     * Get component details for specific component
+     */
+    suspend fun getComponentDetails(component: ComponentType): ComponentHealth? {
+        return _currentHealth.value.components[component]
+    }
+
+    /**
+     * Generate comprehensive diagnostic report
+     */
+    suspend fun generateReport(): DiagnosticReport {
+        return performHealthCheck()
+    }
+
+    private fun getSystemInfo(): Map<String, String> {
+        return mapOf(
+            "platform" to "Android",
+            "apiLevel" to android.os.Build.VERSION.SDK_INT.toString(),
+            "device" to android.os.Build.MODEL,
+            "manufacturer" to android.os.Build.MANUFACTURER
+        )
+    }
 }

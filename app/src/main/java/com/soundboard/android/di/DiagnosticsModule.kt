@@ -1,5 +1,6 @@
 package com.soundboard.android.di
 
+import android.content.Context
 import com.soundboard.android.diagnostics.DiagnosticsManager
 import com.soundboard.android.diagnostics.LoggingManager
 import com.soundboard.android.diagnostics.PerformanceTuner
@@ -7,6 +8,7 @@ import com.soundboard.android.diagnostics.AlertingSystem
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -25,14 +27,14 @@ object DiagnosticsModule {
     
     @Provides
     @Singleton
-    fun provideDiagnosticsManager(): DiagnosticsManager {
-        return DiagnosticsManager()
+    fun provideDiagnosticsManager(@ApplicationContext context: Context): DiagnosticsManager {
+        return DiagnosticsManager(context)
     }
     
     @Provides
     @Singleton
-    fun provideLoggingManager(): LoggingManager {
-        return LoggingManager()
+    fun provideLoggingManager(@ApplicationContext context: Context): LoggingManager {
+        return LoggingManager(context)
     }
     
     @Provides

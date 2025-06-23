@@ -684,4 +684,47 @@ class LoggingManager @Inject constructor(
         // Implementation for XML export
         return "XML export not implemented".toByteArray()
     }
+
+    // =============================================================================
+    // MISSING METHODS FOR EXTERNAL API
+    // =============================================================================
+
+    /**
+     * Get recent patterns for UI display
+     */
+    fun getRecentPatterns(): Flow<List<LogPattern>> = detectedPatterns.asStateFlow()
+
+    /**
+     * Get recent anomalies for UI display
+     */
+    fun getRecentAnomalies(): Flow<List<LogAnomaly>> = detectedAnomalies.asStateFlow()
+
+    /**
+     * Clear all logs from memory and storage
+     */
+    suspend fun clearLogs() {
+        memoryLogs.clear()
+        errorPatterns.clear()
+        performancePatterns.clear()
+        patternFrequency.clear()
+        _detectedPatterns.value = emptyList()
+        _detectedAnomalies.value = emptyList()
+    }
+
+    /**
+     * Generate comprehensive diagnostic report
+     */
+    suspend fun generateReport(): LoggingReport {
+        val currentLogs = memoryLogs.toList()
+        return LoggingReport(
+            timestamp = System.currentTimeMillis(),
+            totalLogs = currentLogs.size,
+            errorCount = currentLogs.count { it.level == LogLevel.ERROR },
+            warningCount = currentLogs.count { it.level == LogLevel.WARN },
+            patterns = _detectedPatterns.value,
+            anomalies = _detectedAnomalies.value,
+            logsByCategory = currentLogs.groupBy { it.category }.mapValues { it.value.size },
+            logsByComponent = currentLogs.groupBy { it.component }.mapValues { it.value.size }
+        )
+    }
 } 

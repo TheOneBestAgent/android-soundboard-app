@@ -165,15 +165,7 @@ data class NotificationConfig(
     val template: String? = null
 )
 
-/**
- * Time range for quiet hours
- */
-@Serializable
-data class TimeRange(
-    val startHour: Int, // 0-23
-    val endHour: Int,   // 0-23
-    val timezone: String = "UTC"
-)
+// TimeRange is defined in DiagnosticsModels.kt - using that definition
 
 // =============================================================================
 // SYSTEM STATUS MODELS

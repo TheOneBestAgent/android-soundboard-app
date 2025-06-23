@@ -118,12 +118,15 @@ class PerformanceTuner @Inject constructor(
                 val results = applyOptimizations(recommendations)
                 
                 loggingManager.logEvent(
-                    LogLevel.INFO,
-                    LogCategory.PERFORMANCE,
-                    "One-time optimization completed",
-                    mapOf(
-                        "optimizationsApplied" to results.size.toString(),
-                        "averageImprovement" to results.map { it.improvementPercentage }.average().toString()
+                    LogEvent(
+                        level = LogLevel.INFO,
+                        category = LogCategory.PERFORMANCE,
+                        message = "One-time optimization completed",
+                        metadata = mapOf(
+                            "optimizationsApplied" to results.size.toString(),
+                            "averageImprovement" to results.map { it.improvementPercentage }.average().toString()
+                        ),
+                        component = ComponentType.METRICS
                     )
                 )
                 
@@ -135,9 +138,13 @@ class PerformanceTuner @Inject constructor(
                 )
             } catch (e: Exception) {
                 loggingManager.logEvent(
-                    LogLevel.ERROR,
-                    LogCategory.PERFORMANCE,
-                    "Optimization failed: ${e.message}"
+                    LogEvent(
+                        level = LogLevel.ERROR,
+                        category = LogCategory.PERFORMANCE,
+                        message = "Optimization failed: ${e.message}",
+                        metadata = mapOf("error" to (e.message ?: "Unknown error")),
+                        component = ComponentType.METRICS
+                    )
                 )
                 throw e
             }
@@ -168,21 +175,28 @@ class PerformanceTuner @Inject constructor(
                 val results = applyOptimizations(profile.optimizations)
                 
                 loggingManager.logEvent(
-                    LogLevel.INFO,
-                    LogCategory.PERFORMANCE,
-                    "Applied optimization profile: $profileName",
-                    mapOf(
-                        "optimizationsCount" to results.size.toString(),
-                        "successRate" to (results.count { it.success } / results.size.toDouble()).toString()
+                    LogEvent(
+                        level = LogLevel.INFO,
+                        category = LogCategory.PERFORMANCE,
+                        message = "Applied optimization profile: $profileName",
+                        metadata = mapOf(
+                            "optimizationsCount" to results.size.toString(),
+                            "successRate" to (results.count { it.success } / results.size.toDouble()).toString()
+                        ),
+                        component = ComponentType.METRICS
                     )
                 )
                 
                 results.all { it.success }
             } catch (e: Exception) {
                 loggingManager.logEvent(
-                    LogLevel.ERROR,
-                    LogCategory.PERFORMANCE,
-                    "Failed to apply optimization profile $profileName: ${e.message}"
+                    LogEvent(
+                        level = LogLevel.ERROR,
+                        category = LogCategory.PERFORMANCE,
+                        message = "Failed to apply optimization profile $profileName: ${e.message}",
+                        metadata = mapOf("profile" to profileName, "error" to (e.message ?: "Unknown error")),
+                        component = ComponentType.METRICS
+                    )
                 )
                 false
             }
@@ -207,18 +221,25 @@ class PerformanceTuner @Inject constructor(
                 }
                 
                 loggingManager.logEvent(
-                    LogLevel.WARN,
-                    LogCategory.PERFORMANCE,
-                    "Rolled back optimizations",
-                    mapOf("count" to rolledBack.toString())
+                    LogEvent(
+                        level = LogLevel.WARN,
+                        category = LogCategory.PERFORMANCE,
+                        message = "Rolled back optimizations",
+                        metadata = mapOf("count" to rolledBack.toString()),
+                        component = ComponentType.METRICS
+                    )
                 )
                 
                 rolledBack > 0
             } catch (e: Exception) {
                 loggingManager.logEvent(
-                    LogLevel.ERROR,
-                    LogCategory.PERFORMANCE,
-                    "Failed to rollback optimizations: ${e.message}"
+                    LogEvent(
+                        level = LogLevel.ERROR,
+                        category = LogCategory.PERFORMANCE,
+                        message = "Failed to rollback optimizations: ${e.message}",
+                        metadata = mapOf("error" to (e.message ?: "Unknown error")),
+                        component = ComponentType.METRICS
+                    )
                 )
                 false
             }
@@ -242,9 +263,13 @@ class PerformanceTuner @Inject constructor(
                     
                 } catch (e: Exception) {
                     loggingManager.logEvent(
-                        LogLevel.ERROR,
-                        LogCategory.PERFORMANCE,
-                        "Performance monitoring error: ${e.message}"
+                        LogEvent(
+                            level = LogLevel.ERROR,
+                            category = LogCategory.PERFORMANCE,
+                            message = "Performance monitoring error: ${e.message}",
+                            metadata = mapOf("error" to (e.message ?: "Unknown error")),
+                            component = ComponentType.METRICS
+                        )
                     )
                 }
                 

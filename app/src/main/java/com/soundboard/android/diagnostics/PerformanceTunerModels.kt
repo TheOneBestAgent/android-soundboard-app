@@ -43,6 +43,17 @@ enum class OptimizationExecutionStatus {
     ROLLED_BACK
 }
 
+/**
+ * Status of optimization state
+ */
+enum class OptimizationStatus {
+    PENDING,
+    RUNNING,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+}
+
 // =============================================================================
 // PERFORMANCE MEASUREMENT MODELS
 // =============================================================================
