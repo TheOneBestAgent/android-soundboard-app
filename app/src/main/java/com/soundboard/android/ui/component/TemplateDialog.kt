@@ -90,20 +90,20 @@ fun TemplateDialog(
     onDismiss: () -> Unit,
     onSelectTemplate: (LayoutTemplate) -> Unit
 ) {
-    var selectedCategory by remember { mutableStateOf(LayoutCategory.STREAMING) }
+    var selectedCategory by remember { mutableStateOf(LayoutCategory.GENERAL) }
     
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
-            usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = true
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
         )
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+                .fillMaxHeight(0.9f)
                 .padding(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = DarkBlueSurface
@@ -115,7 +115,7 @@ fun TemplateDialog(
                     .fillMaxSize()
                     .padding(24.dp)
             ) {
-                // Header
+                // Header - Fixed
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -152,10 +152,11 @@ fun TemplateDialog(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                // Category Filter
+                // Category Filter - Fixed
                 LazyRow(
                     modifier = Modifier.padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
                     items(LayoutCategory.values().filter { it != LayoutCategory.CUSTOM }) { category ->
                         TemplateCategoryChip(
@@ -166,10 +167,11 @@ fun TemplateDialog(
                     }
                 }
                 
-                // Templates List
+                // Templates List - Scrollable
                 LazyColumn(
+                    modifier = Modifier.weight(1f), // Takes remaining space
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
+                    contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     val filteredTemplates = predefinedTemplates.filter { template ->
                         selectedCategory == LayoutCategory.GENERAL || template.category == selectedCategory
@@ -191,18 +193,16 @@ fun TemplateDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Footer
+                // Footer - Fixed
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = TextSecondary
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            "Browse Templates Later",
+                            color = TextSecondary
                         )
-                    ) {
-                        Text("Cancel")
                     }
                 }
             }

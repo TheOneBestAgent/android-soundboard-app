@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
@@ -28,6 +30,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.soundboard.android.data.model.ConnectionHistory
 import com.soundboard.android.network.NetworkDiscoveryService
 import java.text.SimpleDateFormat
@@ -56,18 +59,26 @@ fun ConnectionDialog(
     
     val tabs = listOf("Discovery", "Manual", "History", "QR Code")
     
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
+                .fillMaxHeight(0.9f)
                 .padding(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            shape = RoundedCornerShape(16.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Header
+                // Header - Fixed height
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -89,7 +100,7 @@ fun ConnectionDialog(
                     }
                 }
                 
-                // Tabs
+                // Tabs - Fixed height
                 TabRow(selectedTabIndex = selectedTab) {
                     tabs.forEachIndexed { index, title ->
                         Tab(
@@ -100,11 +111,11 @@ fun ConnectionDialog(
                     }
                 }
                 
-                // Content
+                // Content - Scrollable area that takes remaining space
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
+                        .fillMaxWidth()
+                        .weight(1f) // Takes all remaining space
                         .padding(24.dp)
                 ) {
                     when (selectedTab) {
@@ -164,7 +175,7 @@ fun ConnectionDialog(
                     }
                 }
                 
-                // Footer
+                // Footer - Fixed height
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -192,7 +203,10 @@ private fun AutoDiscoveryContent(
     onConnect: (String, Int) -> Unit,
     isConnecting: Boolean
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         // Discovery header
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -239,7 +253,7 @@ private fun AutoDiscoveryContent(
             }
         }
         
-        // Results
+        // Results or empty state
         if (discoveredServers.isNotEmpty()) {
             Text(
                 text = "Found ${discoveredServers.size} server${if (discoveredServers.size == 1) "" else "s"}",
@@ -247,8 +261,13 @@ private fun AutoDiscoveryContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
+            // Scrollable server list
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f), // Takes remaining space and allows scrolling
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
             ) {
                 items(discoveredServers) { server ->
                     ServerCard(
@@ -259,18 +278,60 @@ private fun AutoDiscoveryContent(
                 }
             }
         } else if (!isDiscovering) {
-            EmptyStateCard(
-                icon = Icons.Default.NetworkCheck,
-                title = "No servers found",
-                subtitle = "Tap 'Start Discovery' to search for servers on your network"
+            // Empty state
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
-                Button(
-                    onClick = onStartDiscovery,
-                    enabled = !isConnecting
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Start Discovery")
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "No servers found",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                    
+                    Text(
+                        text = "Make sure your soundboard server is running on the same network",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = onStartDiscovery,
+                        enabled = !isConnecting
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Start Discovery")
+                    }
                 }
             }
         }
@@ -460,7 +521,10 @@ private fun HistoryContent(
     onConnect: (String, Int) -> Unit,
     isConnecting: Boolean
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
         Text(
             text = "Connection History",
             style = MaterialTheme.typography.titleMedium,
@@ -468,7 +532,13 @@ private fun HistoryContent(
         )
         
         if (connectionHistory.isNotEmpty()) {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f), // Takes remaining space and allows scrolling
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
                 items(connectionHistory) { history ->
                     val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
                     
@@ -517,11 +587,47 @@ private fun HistoryContent(
                 }
             }
         } else {
-            EmptyStateCard(
-                icon = Icons.Default.History,
-                title = "No connection history",
-                subtitle = "Your previous connections will appear here"
-            )
+            // Empty state takes remaining space
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.History,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "No connection history",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                    
+                    Text(
+                        text = "Your previous connections will appear here",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -532,15 +638,19 @@ private fun QRCodeContent(
     isConnecting: Boolean
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = "QR Code Pairing",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium
         )
+        
+        Spacer(modifier = Modifier.height(24.dp))
         
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -551,7 +661,7 @@ private fun QRCodeContent(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -565,26 +675,36 @@ private fun QRCodeContent(
                 Text(
                     text = "Instant Connection Setup",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
                 )
                 
                 Text(
                     text = "Scan a QR code from your soundboard server to instantly connect with all the correct settings.",
                     style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 Button(
                     onClick = onQRCodeScan,
                     enabled = !isConnecting,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Default.QrCodeScanner, 
+                        contentDescription = null, 
+                        modifier = Modifier.size(18.dp)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Scan QR Code")
                 }
             }
         }
+        
+        Spacer(modifier = Modifier.weight(1f)) // Pushes content to center
     }
 }
 

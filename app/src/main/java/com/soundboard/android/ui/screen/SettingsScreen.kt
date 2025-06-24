@@ -279,7 +279,18 @@ fun SettingsScreen(
     if (showAppearanceSettings) {
         AppearanceSettingsDialog(
             onDismiss = { showAppearanceSettings = false },
-            settingsRepository = settingsRepository
+            currentTheme = "System", // TODO: Get from settings
+            currentAccentColor = "Blue", // TODO: Get from settings  
+            isDarkTheme = false, // TODO: Get from settings
+            onThemeChange = { theme ->
+                // TODO: Update theme in settings
+            },
+            onAccentColorChange = { color ->
+                // TODO: Update accent color in settings
+            },
+            onDarkThemeToggle = { isDark ->
+                // TODO: Update dark theme setting
+            }
         )
     }
     

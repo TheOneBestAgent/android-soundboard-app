@@ -17,14 +17,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.soundboard.android.data.model.LayoutPreset
 import com.soundboard.android.data.model.SoundboardLayout
 import com.soundboard.android.ui.theme.*
+import androidx.compose.foundation.BorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,11 +41,19 @@ fun GridLayoutSettingsDialog(
     var enableGlowEffect by remember { mutableStateOf(currentLayout.enableGlowEffect) }
     var selectedPreset by remember { mutableStateOf(currentLayout.layoutPreset) }
     
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.9f),
+                .fillMaxHeight(0.95f)
+                .padding(16.dp),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = DarkBlueSurface)
         ) {
@@ -53,7 +62,7 @@ fun GridLayoutSettingsDialog(
                     .fillMaxSize()
                     .padding(24.dp)
             ) {
-                // Header
+                // Header - Fixed
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -84,36 +93,13 @@ fun GridLayoutSettingsDialog(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
+                // Scrollable content area
                 LazyColumn(
+                    modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = Modifier.weight(1f)
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    // Current Layout Info
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = DarkBlueVariant),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Text(
-                                    text = "Current Layout: ${currentLayout.name}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "${selectedColumns}×${selectedRows} grid • ${selectedColumns * selectedRows} buttons max",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = NeonPinkLight
-                                )
-                            }
-                        }
-                    }
-                    
-                    // Preset Selection
+                    // Layout Presets
                     item {
                         Text(
                             text = "Layout Presets",
@@ -144,200 +130,70 @@ fun GridLayoutSettingsDialog(
                     
                     // Custom Grid Size
                     item {
-                        Text(
-                            text = "Custom Grid Size",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        SettingsSection(
+                            title = "Custom Grid Size",
+                            subtitle = "Configure rows and columns"
                         ) {
-                            // Columns
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Columns",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondary
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    IconButton(
-                                        onClick = { 
-                                            if (selectedColumns > 2) {
-                                                selectedColumns--
-                                                selectedPreset = LayoutPreset.CUSTOM
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (selectedColumns > 2) NeonPink.copy(alpha = 0.2f) else ButtonSurface.copy(alpha = 0.5f))
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Remove,
-                                            contentDescription = "Decrease columns",
-                                            tint = if (selectedColumns > 2) NeonPink else TextDisabled,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                    
-                                    Text(
-                                        text = selectedColumns.toString(),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.width(40.dp)
-                                    )
-                                    
-                                    IconButton(
-                                        onClick = { 
-                                            if (selectedColumns < 8) {
-                                                selectedColumns++
-                                                selectedPreset = LayoutPreset.CUSTOM
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (selectedColumns < 8) NeonPink.copy(alpha = 0.2f) else ButtonSurface.copy(alpha = 0.5f))
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = "Increase columns",
-                                            tint = if (selectedColumns < 8) NeonPink else TextDisabled,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            }
+                            // Grid size controls
+                            Text(
+                                text = "Columns: $selectedColumns",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
                             
-                            // Rows
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Rows",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondary
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    IconButton(
-                                        onClick = { 
-                                            if (selectedRows > 2) {
-                                                selectedRows--
-                                                selectedPreset = LayoutPreset.CUSTOM
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (selectedRows > 2) NeonPink.copy(alpha = 0.2f) else ButtonSurface.copy(alpha = 0.5f))
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Remove,
-                                            contentDescription = "Decrease rows",
-                                            tint = if (selectedRows > 2) NeonPink else TextDisabled,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                    
-                                    Text(
-                                        text = selectedRows.toString(),
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = TextPrimary,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.width(40.dp)
-                                    )
-                                    
-                                    IconButton(
-                                        onClick = { 
-                                            if (selectedRows < 10) {
-                                                selectedRows++
-                                                selectedPreset = LayoutPreset.CUSTOM
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (selectedRows < 10) NeonPink.copy(alpha = 0.2f) else ButtonSurface.copy(alpha = 0.5f))
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            contentDescription = "Increase rows",
-                                            tint = if (selectedRows < 10) NeonPink else TextDisabled,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                            }
+                            Slider(
+                                value = selectedColumns.toFloat(),
+                                onValueChange = { 
+                                    selectedColumns = it.toInt()
+                                    selectedPreset = LayoutPreset.CUSTOM
+                                },
+                                valueRange = 2f..6f,
+                                steps = 3,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Text(
+                                text = "Rows: $selectedRows",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
+                            
+                            Slider(
+                                value = selectedRows.toFloat(),
+                                onValueChange = { 
+                                    selectedRows = it.toInt()
+                                    selectedPreset = LayoutPreset.CUSTOM
+                                },
+                                valueRange = 3f..8f,
+                                steps = 4,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                     
-                    // Visual Preview
+                    // Spacing and Appearance
                     item {
-                        Text(
-                            text = "Grid Preview",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        GridPreview(
-                            columns = selectedColumns,
-                            rows = selectedRows,
-                            spacing = buttonSpacing,
-                            cornerRadius = cornerRadius
-                        )
-                    }
-                    
-                    // Button Appearance
-                    item {
-                        Text(
-                            text = "Button Appearance",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        // Button Spacing
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Button Spacing",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondary
-                                )
-                                Text(
-                                    text = "${buttonSpacing.toInt()}dp",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = NeonPink,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            
-                            Spacer(modifier = Modifier.height(8.dp))
+                        SettingsSection(
+                            title = "Spacing & Appearance",
+                            subtitle = "Fine-tune the visual style"
+                        ) {
+                            Text(
+                                text = "Button Spacing: ${buttonSpacing.toInt()}dp",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
                             
                             Slider(
                                 value = buttonSpacing,
@@ -345,36 +201,20 @@ fun GridLayoutSettingsDialog(
                                 valueRange = 4f..16f,
                                 steps = 11,
                                 colors = SliderDefaults.colors(
-                                    thumbColor = NeonPink,
-                                    activeTrackColor = NeonPink,
-                                    inactiveTrackColor = ButtonSurface
-                                )
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                                modifier = Modifier.fillMaxWidth()
                             )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Corner Radius
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Corner Radius",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondary
-                                )
-                                Text(
-                                    text = "${cornerRadius.toInt()}dp",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = NeonPink,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
                             
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Text(
+                                text = "Corner Radius: ${cornerRadius.toInt()}dp",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
                             
                             Slider(
                                 value = cornerRadius,
@@ -382,54 +222,59 @@ fun GridLayoutSettingsDialog(
                                 valueRange = 4f..24f,
                                 steps = 19,
                                 colors = SliderDefaults.colors(
-                                    thumbColor = NeonPink,
-                                    activeTrackColor = NeonPink,
-                                    inactiveTrackColor = ButtonSurface
-                                )
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                                    inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                                modifier = Modifier.fillMaxWidth()
                             )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Glow Effect Toggle
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { enableGlowEffect = !enableGlowEffect }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Switch(
-                                checked = enableGlowEffect,
-                                onCheckedChange = { enableGlowEffect = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = NeonPink,
-                                    checkedTrackColor = NeonPink.copy(alpha = 0.5f),
-                                    uncheckedThumbColor = TextDisabled,
-                                    uncheckedTrackColor = ButtonSurface
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = "Neon Glow Effect",
+                                    text = "Enable Glow Effect",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Medium
+                                    color = TextPrimary
                                 )
-                                Text(
-                                    text = "Add glowing borders to sound buttons",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondary
+                                
+                                Switch(
+                                    checked = enableGlowEffect,
+                                    onCheckedChange = { enableGlowEffect = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                        uncheckedThumbColor = TextSecondary,
+                                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
                                 )
                             }
                         }
                     }
+                    
+                    // Preview
+                    item {
+                        SettingsSection(
+                            title = "Preview",
+                            subtitle = "See how your layout will look"
+                        ) {
+                            GridPreview(
+                                columns = selectedColumns,
+                                rows = selectedRows,
+                                spacing = buttonSpacing,
+                                cornerRadius = cornerRadius
+                            )
+                        }
+                    }
                 }
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
-                // Action Buttons
+                // Action buttons - Fixed at bottom
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -440,7 +285,7 @@ fun GridLayoutSettingsDialog(
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = TextSecondary
                         ),
-                        border = BorderStroke(1.dp, TextSecondary.copy(alpha = 0.5f))
+                        border = BorderStroke(1.dp, ButtonSurface)
                     ) {
                         Text("Cancel")
                     }
@@ -453,19 +298,17 @@ fun GridLayoutSettingsDialog(
                                 buttonSpacing = buttonSpacing,
                                 cornerRadius = cornerRadius,
                                 enableGlowEffect = enableGlowEffect,
-                                layoutPreset = selectedPreset,
-                                maxButtons = selectedColumns * selectedRows,
-                                updatedAt = System.currentTimeMillis()
+                                layoutPreset = selectedPreset
                             )
                             onSaveLayout(updatedLayout)
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = NeonPink,
+                            containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = Color.White
                         )
                     ) {
-                        Text("Save Changes")
+                        Text("Save Layout")
                     }
                 }
             }
@@ -593,5 +436,30 @@ fun GridPreview(
                 fontWeight = FontWeight.Medium
             )
         }
+    }
+}
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    subtitle: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = TextPrimary,
+            fontWeight = FontWeight.SemiBold
+        )
+        
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+        
+        content()
     }
 } 

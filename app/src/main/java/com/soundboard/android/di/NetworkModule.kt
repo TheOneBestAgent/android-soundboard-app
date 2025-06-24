@@ -3,6 +3,14 @@ package com.soundboard.android.di
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.soundboard.android.network.SocketManager
+import com.soundboard.android.network.DeviceSessionManager
+import com.soundboard.android.network.SessionCoordinator
+// Phase 4.2: Performance Optimization Components
+import com.soundboard.android.network.ConnectionPoolManager
+import com.soundboard.android.network.CacheManager
+import com.soundboard.android.network.CompressionManager
+import com.soundboard.android.network.RequestPipelineManager
+import com.soundboard.android.network.PerformanceMetrics
 import com.soundboard.android.network.api.SoundboardApiService
 import com.soundboard.android.network.api.MyInstantApiService
 import dagger.Module
@@ -86,6 +94,53 @@ object NetworkModule {
     @Singleton
     fun provideMyInstantApiService(@Named("myinstant") retrofit: Retrofit): MyInstantApiService {
         return retrofit.create(MyInstantApiService::class.java)
+    }
+    
+    // Phase 4.1: Multi-Device Support Dependencies
+    @Provides
+    @Singleton
+    fun provideDeviceSessionManager(): DeviceSessionManager {
+        return DeviceSessionManager()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideSessionCoordinator(
+        deviceSessionManager: DeviceSessionManager,
+        gson: Gson
+    ): SessionCoordinator {
+        return SessionCoordinator(deviceSessionManager, gson)
+    }
+    
+    // Phase 4.2: Performance Optimization Dependencies
+    @Provides
+    @Singleton
+    fun provideConnectionPoolManager(): ConnectionPoolManager {
+        return ConnectionPoolManager()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideCacheManager(): CacheManager {
+        return CacheManager()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideCompressionManager(): CompressionManager {
+        return CompressionManager()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideRequestPipelineManager(): RequestPipelineManager {
+        return RequestPipelineManager()
+    }
+    
+    @Provides
+    @Singleton
+    fun providePerformanceMetrics(): PerformanceMetrics {
+        return PerformanceMetrics()
     }
 }
 

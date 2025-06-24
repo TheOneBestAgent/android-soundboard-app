@@ -1,24 +1,23 @@
 package com.soundboard.android.ui.component
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.soundboard.android.ui.theme.*
 
 data class ThemeOption(
     val name: String,
@@ -37,277 +36,159 @@ data class ColorScheme(
 @Composable
 fun AppearanceSettingsDialog(
     onDismiss: () -> Unit,
-    settingsRepository: com.soundboard.android.data.repository.SettingsRepository
+    currentTheme: String,
+    currentAccentColor: String,
+    isDarkTheme: Boolean,
+    onThemeChange: (String) -> Unit,
+    onAccentColorChange: (String) -> Unit,
+    onDarkThemeToggle: (Boolean) -> Unit
 ) {
-    val selectedTheme by settingsRepository.themeMode.collectAsState()
-    val selectedColorScheme by settingsRepository.colorScheme.collectAsState()
-    val buttonCornerRadius by settingsRepository.buttonCornerRadius.collectAsState()
-    val buttonSpacing by settingsRepository.buttonSpacing.collectAsState()
-    val showButtonLabels by settingsRepository.showButtonLabels.collectAsState()
-    val useCompactLayout by settingsRepository.compactLayout.collectAsState()
-    val animationsEnabled by settingsRepository.animationsEnabled.collectAsState()
-    
-    val themeOptions = listOf(
-        ThemeOption("System Default", "Follow system theme", Icons.Default.Brightness6, null),
-        ThemeOption("Light", "Always use light theme", Icons.Default.LightMode, false),
-        ThemeOption("Dark", "Always use dark theme", Icons.Default.DarkMode, true)
-    )
-    
-    val colorSchemes = listOf(
-        ColorScheme("Blue", Color(0xFF1976D2), Color(0xFF42A5F5)),
-        ColorScheme("Purple", Color(0xFF7B1FA2), Color(0xFFBA68C8)),
-        ColorScheme("Green", Color(0xFF388E3C), Color(0xFF81C784)),
-        ColorScheme("Orange", Color(0xFFF57C00), Color(0xFFFFB74D)),
-        ColorScheme("Red", Color(0xFFD32F2F), Color(0xFFEF5350))
-    )
-    
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
-            usePlatformDefaultWidth = false,
             dismissOnBackPress = true,
-            dismissOnClickOutside = false
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
         )
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f)
                 .padding(16.dp),
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
-            LazyColumn(
+            Column(
                 modifier = Modifier.fillMaxSize()
             ) {
-                item {
-                    // Header
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Appearance Settings",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
-                        }
+                // Header - Fixed
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Appearance Settings",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 }
                 
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+                Divider()
                 
-                // Theme Selection
-                item {
-                    AppearanceSettingsSection(title = "Theme") {
-                        themeOptions.forEach { theme ->
+                // Scrollable content
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f), // Takes remaining space
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Theme Selection
+                    item {
+                        Text(
+                            text = "Theme",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        ThemeSelectionCard(
+                            currentTheme = currentTheme,
+                            onThemeChange = onThemeChange
+                        )
+                    }
+                    
+                    // Dark Theme Toggle
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .selectable(
-                                        selected = selectedTheme == theme.name,
-                                        onClick = { settingsRepository.setThemeMode(theme.name) }
-                                    )
-                                    .padding(vertical = 8.dp, horizontal = 16.dp),
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RadioButton(
-                                    selected = selectedTheme == theme.name,
-                                    onClick = { settingsRepository.setThemeMode(theme.name) }
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Icon(
-                                    imageVector = theme.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = theme.name,
+                                        text = "Dark Theme",
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        text = theme.description,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "Switch between light and dark mode",
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                            }
-                        }
-                    }
-                }
-                
-                // Color Scheme Selection
-                item {
-                    AppearanceSettingsSection(title = "Color Scheme") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            colorSchemes.forEach { scheme ->
-                                ColorSchemeCard(
-                                    colorScheme = scheme,
-                                    isSelected = selectedColorScheme == scheme.name,
-                                    onClick = { settingsRepository.setColorScheme(scheme.name) },
-                                    modifier = Modifier.weight(1f)
+                                
+                                Switch(
+                                    checked = isDarkTheme,
+                                    onCheckedChange = onDarkThemeToggle
                                 )
                             }
                         }
                     }
-                }
-                
-                // Button Customization
-                item {
-                    AppearanceSettingsSection(title = "Button Appearance") {
-                        // Corner Radius
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Corner Radius: ${buttonCornerRadius.toInt()}dp",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Slider(
-                                value = buttonCornerRadius,
-                                onValueChange = { settingsRepository.setButtonCornerRadius(it) },
-                                valueRange = 0f..24f,
-                                steps = 23
-                            )
-                        }
+                    
+                    // Accent Color Selection
+                    item {
+                        Text(
+                            text = "Accent Color",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
                         
-                        // Button Spacing
-                        Column(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "Button Spacing: ${buttonSpacing.toInt()}dp",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Slider(
-                                value = buttonSpacing,
-                                onValueChange = { settingsRepository.setButtonSpacing(it) },
-                                valueRange = 2f..16f,
-                                steps = 13
-                            )
-                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         
-                        // Show Button Labels
-                                                    Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { settingsRepository.setShowButtonLabels(!showButtonLabels) }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Switch(
-                                checked = showButtonLabels,
-                                onCheckedChange = { settingsRepository.setShowButtonLabels(it) }
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "Show Button Labels",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Display text labels on sound buttons",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        AccentColorGrid(
+                            currentAccentColor = currentAccentColor,
+                            onAccentColorChange = onAccentColorChange
+                        )
+                    }
+                    
+                    // Preview Section
+                    item {
+                        Text(
+                            text = "Preview",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        ThemePreviewCard()
                     }
                 }
                 
-                // Layout Options
-                item {
-                    AppearanceSettingsSection(title = "Layout") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { settingsRepository.setCompactLayout(!useCompactLayout) }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Switch(
-                                checked = useCompactLayout,
-                                onCheckedChange = { settingsRepository.setCompactLayout(it) }
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "Compact Layout",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Fit more buttons on screen",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { settingsRepository.setAnimationsEnabled(!animationsEnabled) }
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Switch(
-                                checked = animationsEnabled,
-                                onCheckedChange = { settingsRepository.setAnimationsEnabled(it) }
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = "Animations",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Enable button press animations",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-                
-                // Save Button
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            // Settings are automatically saved when changed
-                            onDismiss()
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
+                // Footer buttons - Fixed at bottom
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Save Settings")
+                        Text("Cancel")
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Apply")
+                    }
                 }
             }
         }
@@ -355,7 +236,7 @@ fun ColorSchemeCard(
             defaultElevation = if (isSelected) 8.dp else 2.dp
         ),
         border = if (isSelected) {
-            androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
         } else null
     ) {
         Column(
@@ -382,6 +263,162 @@ fun ColorSchemeCard(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Medium
             )
+        }
+    }
+}
+
+@Composable
+private fun ThemeSelectionCard(
+    currentTheme: String,
+    onThemeChange: (String) -> Unit
+) {
+    val themes = listOf(
+        "System" to "Follow system setting",
+        "Light" to "Always light mode",
+        "Dark" to "Always dark mode"
+    )
+    
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            themes.forEach { (theme, description) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onThemeChange(theme) }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = currentTheme == theme,
+                        onClick = { onThemeChange(theme) }
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = theme,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccentColorGrid(
+    currentAccentColor: String,
+    onAccentColorChange: (String) -> Unit
+) {
+    val colors = listOf(
+        "Blue" to Color(0xFF2196F3),
+        "Purple" to Color(0xFF9C27B0),
+        "Green" to Color(0xFF4CAF50),
+        "Orange" to Color(0xFFFF9800),
+        "Red" to Color(0xFFF44336),
+        "Teal" to Color(0xFF009688),
+        "Pink" to Color(0xFFE91E63),
+        "Indigo" to Color(0xFF3F51B5)
+    )
+    
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(4.dp)
+            ) {
+                items(colors) { (name, color) ->
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .clickable { onAccentColorChange(name) }
+                            .then(
+                                if (currentAccentColor == name) {
+                                    Modifier.border(3.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                                } else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (currentAccentColor == name) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemePreviewCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "Preview",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Sample UI elements
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Primary")
+                }
+                
+                OutlinedButton(
+                    onClick = { },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Secondary")
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Text(
+                    text = "Sample card with accent color",
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 } 
