@@ -1,6 +1,7 @@
 package com.soundboard.android.diagnostics
 
-import androidx.annotation.VisibleForTesting
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -11,6 +12,7 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.*
+import dagger.Lazy
 
 /**
  * AlertingSystem - Proactive monitoring and intelligent notification system
@@ -32,10 +34,11 @@ import kotlin.math.*
  */
 @Singleton
 class AlertingSystem @Inject constructor(
-    private val diagnosticsManager: DiagnosticsManager,
-    private val loggingManager: LoggingManager,
-    private val performanceTuner: PerformanceTuner
-) {
+    @ApplicationContext private val context: Context,
+    private val diagnosticsProvider: Lazy<DiagnosticsProvider>,
+    private val loggingProvider: Lazy<LoggingProvider>,
+    private val performanceProvider: Lazy<PerformanceProvider>
+) : AlertingProvider {
     companion object {
         private const val MONITORING_INTERVAL_MS = 5_000L // 5 seconds
         private const val ALERT_CORRELATION_WINDOW_MS = 60_000L // 1 minute
@@ -45,31 +48,63 @@ class AlertingSystem @Inject constructor(
         private const val AUTO_RESOLUTION_CHECK_INTERVAL_MS = 30_000L // 30 seconds
     }
     
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val alertMutex = Mutex()
     private val isMonitoring = AtomicBoolean(false)
     
     // Alert tracking
-    private val activeAlerts = ConcurrentHashMap<String, SimpleAlert>()
-    private val alertHistory = mutableListOf<SimpleAlertEvent>()
-    private val alertThresholds = ConcurrentHashMap<AlertType, SimpleThreshold>()
+    private val activeAlerts = ConcurrentHashMap<String, Alert>()
+    private val alertHistory = mutableListOf<AlertEvent>()
+    private val alertThresholds = ConcurrentHashMap<AlertType, AlertThreshold>()
     private val suppressedAlerts = ConcurrentHashMap<String, Long>()
     
     // Notification management
-    private val notificationChannels = ConcurrentHashMap<NotificationChannel, SimpleNotificationConfig>()
+    private val notificationChannels = ConcurrentHashMap<NotificationChannel, NotificationConfig>()
     private val alertRateLimiter = AtomicLong(0)
     
     // Flow for real-time alert updates
-    private val _alertUpdates = MutableStateFlow<SimpleAlertUpdate?>(null)
-    val alertUpdates: StateFlow<SimpleAlertUpdate?> = _alertUpdates.asStateFlow()
+    private val _alertUpdates = MutableStateFlow<AlertUpdate?>(null)
+    val alertUpdates: StateFlow<AlertUpdate?> = _alertUpdates.asStateFlow()
     
-    private val _systemStatus = MutableStateFlow(SimpleAlertingSystemStatus())
-    val systemStatus: StateFlow<SimpleAlertingSystemStatus> = _systemStatus.asStateFlow()
+    private val _systemStatus = MutableStateFlow(AlertingSystemStatus())
+    val systemStatus: StateFlow<AlertingSystemStatus> = _systemStatus.asStateFlow()
     
     init {
         initializeDefaultThresholds()
         initializeNotificationChannels()
-        startMonitoring()
+        scope.launch {
+            startMonitoring()
+        }
+    }
+    
+    // =============================================================================
+    // AlertingProvider Implementation
+    // =============================================================================
+
+    override suspend fun createAlert(
+        type: AlertType,
+        severity: AlertSeverity,
+        message: String,
+        context: Map<String, String>
+    ): Alert {
+        return alertMutex.withLock {
+            val alert = Alert(
+                id = generateAlertId(),
+                type = type,
+                severity = severity,
+                message = message,
+                context = context,
+                timestamp = System.currentTimeMillis(),
+                status = AlertStatus.ACTIVE
+            )
+            
+            processNewAlert(alert)
+            alert
+        }
+    }
+
+    override suspend fun getActiveAlerts(): List<Alert> {
+        return activeAlerts.values.filter { it.status == AlertStatus.ACTIVE }.toList()
     }
     
     // =============================================================================
@@ -81,12 +116,13 @@ class AlertingSystem @Inject constructor(
      */
     suspend fun startMonitoring() {
         if (isMonitoring.compareAndSet(false, true)) {
-            loggingManager.logEvent(
+            loggingProvider.get().logEvent(
                 LogEvent(
                     level = LogLevel.INFO,
-                    category = LogCategory.SYSTEM,
+                    category = LogCategory.ALERT,
                     message = "Alerting system monitoring started",
-                    timestamp = System.currentTimeMillis()
+                    metadata = mapOf("system" to "alerting"),
+                    component = ComponentType.SYSTEM
                 )
             )
             
@@ -100,39 +136,15 @@ class AlertingSystem @Inject constructor(
      */
     suspend fun stopMonitoring() {
         if (isMonitoring.compareAndSet(true, false)) {
-            loggingManager.logEvent(
+            loggingProvider.get().logEvent(
                 LogEvent(
                     level = LogLevel.INFO,
-                    category = LogCategory.SYSTEM,
+                    category = LogCategory.ALERT,
                     message = "Alerting system monitoring stopped",
-                    timestamp = System.currentTimeMillis()
+                    metadata = mapOf("system" to "alerting"),
+                    component = ComponentType.SYSTEM
                 )
             )
-        }
-    }
-    
-    /**
-     * Create a manual alert
-     */
-    suspend fun createAlert(
-        type: AlertType,
-        severity: AlertSeverity,
-        message: String,
-        context: Map<String, String> = emptyMap()
-    ): SimpleAlert {
-        return alertMutex.withLock {
-            val alert = SimpleAlert(
-                id = generateAlertId(),
-                type = type,
-                severity = severity,
-                message = message,
-                context = context,
-                timestamp = System.currentTimeMillis(),
-                status = AlertStatus.ACTIVE
-            )
-            
-            processNewAlert(alert)
-            alert
         }
     }
     
@@ -152,18 +164,19 @@ class AlertingSystem @Inject constructor(
                 activeAlerts[alertId] = updatedAlert
                 recordAlertEvent(AlertEventType.ACKNOWLEDGED, updatedAlert)
                 
-                _alertUpdates.value = SimpleAlertUpdate(
+                _alertUpdates.value = AlertUpdate(
                     alert = updatedAlert,
                     action = AlertAction.ACKNOWLEDGED,
                     timestamp = System.currentTimeMillis()
                 )
                 
-                loggingManager.logEvent(
+                loggingProvider.get().logEvent(
                     LogEvent(
                         level = LogLevel.INFO,
-                        category = LogCategory.SYSTEM,
+                        category = LogCategory.ALERT,
                         message = "Alert acknowledged: $alertId by $acknowledgedBy",
-                        timestamp = System.currentTimeMillis()
+                        metadata = mapOf("alertId" to alertId, "acknowledgedBy" to acknowledgedBy),
+                        component = ComponentType.SYSTEM
                     )
                 )
                 
@@ -175,12 +188,12 @@ class AlertingSystem @Inject constructor(
     }
     
     /**
-     * Resolve an alert manually
+     * Resolve an active or acknowledged alert
      */
     suspend fun resolveAlert(alertId: String, resolvedBy: String, resolution: String): Boolean {
         return alertMutex.withLock {
             val alert = activeAlerts[alertId]
-            if (alert != null) {
+            if (alert != null && (alert.status == AlertStatus.ACTIVE || alert.status == AlertStatus.ACKNOWLEDGED)) {
                 val updatedAlert = alert.copy(
                     status = AlertStatus.RESOLVED,
                     resolvedBy = resolvedBy,
@@ -188,21 +201,26 @@ class AlertingSystem @Inject constructor(
                     resolution = resolution
                 )
                 
-                activeAlerts.remove(alertId)
+                activeAlerts[alertId] = updatedAlert
                 recordAlertEvent(AlertEventType.RESOLVED, updatedAlert)
                 
-                _alertUpdates.value = SimpleAlertUpdate(
+                _alertUpdates.value = AlertUpdate(
                     alert = updatedAlert,
                     action = AlertAction.RESOLVED,
                     timestamp = System.currentTimeMillis()
                 )
                 
-                loggingManager.logEvent(
+                loggingProvider.get().logEvent(
                     LogEvent(
                         level = LogLevel.INFO,
-                        category = LogCategory.SYSTEM,
-                        message = "Alert resolved: $alertId by $resolvedBy - $resolution",
-                        timestamp = System.currentTimeMillis()
+                        category = LogCategory.ALERT,
+                        message = "Alert resolved: $alertId by $resolvedBy",
+                        metadata = mapOf(
+                            "alertId" to alertId,
+                            "resolvedBy" to resolvedBy,
+                            "resolution" to resolution
+                        ),
+                        component = ComponentType.SYSTEM
                     )
                 )
                 
@@ -216,39 +234,33 @@ class AlertingSystem @Inject constructor(
     /**
      * Update alert thresholds
      */
-    suspend fun updateThreshold(type: AlertType, threshold: SimpleThreshold) {
+    suspend fun updateThreshold(type: AlertType, threshold: AlertThreshold) {
         alertMutex.withLock {
             alertThresholds[type] = threshold
             
-            loggingManager.logEvent(
+            loggingProvider.get().logEvent(
                 LogEvent(
                     level = LogLevel.INFO,
-                    category = LogCategory.SYSTEM,
+                    category = LogCategory.ALERT,
                     message = "Alert threshold updated for $type",
-                    timestamp = System.currentTimeMillis()
+                    metadata = mapOf("alertType" to type.toString(), "threshold" to threshold.toString()),
+                    component = ComponentType.SYSTEM
                 )
             )
         }
     }
     
     /**
-     * Get current active alerts
-     */
-    fun getActiveAlerts(): List<SimpleAlert> {
-        return activeAlerts.values.toList().sortedByDescending { it.timestamp }
-    }
-    
-    /**
      * Get alert history
      */
-    fun getAlertHistory(limit: Int = 100): List<SimpleAlertEvent> {
+    fun getAlertHistory(limit: Int = 100): List<AlertEvent> {
         return alertHistory.takeLast(limit).sortedByDescending { it.timestamp }
     }
     
     /**
      * Get alert statistics
      */
-    fun getAlertStatistics(): SimpleAlertStatistics {
+    fun getAlertStatistics(): AlertStatistics {
         val now = System.currentTimeMillis()
         val last24h = now - 86_400_000L // 24 hours
         val last7d = now - 604_800_000L // 7 days
@@ -256,7 +268,7 @@ class AlertingSystem @Inject constructor(
         val recent24h = alertHistory.filter { it.timestamp >= last24h }
         val recent7d = alertHistory.filter { it.timestamp >= last7d }
         
-        return SimpleAlertStatistics(
+        return AlertStatistics(
             totalActiveAlerts = activeAlerts.size,
             totalAlertsLast24h = recent24h.size,
             totalAlertsLast7d = recent7d.size,
@@ -282,14 +294,7 @@ class AlertingSystem @Inject constructor(
                     updateSystemStatus()
                     
                 } catch (e: Exception) {
-                    loggingManager.logEvent(
-                        LogEvent(
-                            level = LogLevel.ERROR,
-                            category = LogCategory.SYSTEM,
-                            message = "Alert monitoring error: ${e.message}",
-                            timestamp = System.currentTimeMillis()
-                        )
-                    )
+                    loggingProvider.get().logError("Alert monitoring error", e)
                 }
                 
                 delay(MONITORING_INTERVAL_MS)
@@ -301,18 +306,45 @@ class AlertingSystem @Inject constructor(
         scope.launch {
             while (isMonitoring.get()) {
                 try {
-                    checkAutoResolution()
+                    // Check each active alert for auto-resolution
+                    val alertsToCheck = activeAlerts.values.filter { 
+                        it.status == AlertStatus.ACTIVE || it.status == AlertStatus.ACKNOWLEDGED 
+                    }
+                    
+                    for (alert in alertsToCheck) {
+                        if (shouldAutoResolve(alert)) {
+                            val updatedAlert = alert.copy(
+                                status = AlertStatus.AUTO_RESOLVED,
+                                resolvedAt = System.currentTimeMillis(),
+                                resolution = "Auto-resolved: Condition no longer met"
+                            )
+                            
+                            activeAlerts[alert.id] = updatedAlert
+                            recordAlertEvent(AlertEventType.AUTO_RESOLVED, updatedAlert)
+                            
+                            _alertUpdates.value = AlertUpdate(
+                                alert = updatedAlert,
+                                action = AlertAction.AUTO_RESOLVED,
+                                timestamp = System.currentTimeMillis()
+                            )
+                            
+                            loggingProvider.get().logEvent(
+                                LogEvent(
+                                    level = LogLevel.INFO,
+                                    category = LogCategory.ALERT,
+                                    message = "Alert auto-resolved: ${alert.id}",
+                                    metadata = mapOf("alertId" to alert.id, "alertType" to alert.type.toString()),
+                                    component = ComponentType.SYSTEM
+                                )
+                            )
+                        }
+                    }
+                    
+                    // Cleanup expired suppressions
                     cleanupExpiredSuppressions()
                     
                 } catch (e: Exception) {
-                    loggingManager.logEvent(
-                        LogEvent(
-                            level = LogLevel.ERROR,
-                            category = LogCategory.SYSTEM,
-                            message = "Auto-resolution check error: ${e.message}",
-                            timestamp = System.currentTimeMillis()
-                        )
-                    )
+                    loggingProvider.get().logError("Auto-resolution error", e)
                 }
                 
                 delay(AUTO_RESOLUTION_CHECK_INTERVAL_MS)
@@ -325,146 +357,149 @@ class AlertingSystem @Inject constructor(
     // =============================================================================
     
     private suspend fun checkSystemHealth() {
-        try {
-            val healthScore = diagnosticsManager.getCurrentHealthScore().first()
-            val threshold = alertThresholds[AlertType.HEALTH_SCORE_LOW]
-            
-            if (threshold != null && healthScore.overall < threshold.criticalValue) {
-                triggerAlert(
-                    type = AlertType.HEALTH_SCORE_LOW,
-                    severity = AlertSeverity.CRITICAL,
-                    message = "System health score critically low: ${(healthScore.overall * 100).toInt()}%",
-                    context = mapOf(
-                        "healthScore" to healthScore.overall.toString(),
-                        "threshold" to threshold.criticalValue.toString(),
-                        "trend" to healthScore.trend.name
-                    )
-                )
-            } else if (threshold != null && healthScore.overall < threshold.warningValue) {
-                triggerAlert(
-                    type = AlertType.HEALTH_SCORE_LOW,
-                    severity = AlertSeverity.HIGH,
-                    message = "System health score below warning threshold: ${(healthScore.overall * 100).toInt()}%",
-                    context = mapOf(
-                        "healthScore" to healthScore.overall.toString(),
-                        "threshold" to threshold.warningValue.toString(),
-                        "trend" to healthScore.trend.name
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            // Handle silently to avoid alert loops
+        val healthScore = diagnosticsProvider.get().getCurrentReport().systemHealth.overall
+        
+        if (healthScore < 0.5) {
+            triggerAlert(
+                type = AlertType.HEALTH_SCORE_LOW,
+                severity = if (healthScore < 0.3) AlertSeverity.CRITICAL else AlertSeverity.HIGH,
+                message = "System health score is critically low: ${(healthScore * 100).toInt()}%",
+                context = mapOf("healthScore" to healthScore.toString())
+            )
         }
     }
     
     private suspend fun checkPerformanceMetrics() {
-        try {
-            val metrics = performanceTuner.performanceMetrics.first()
-            
-            // Check performance trend
-            val trendThreshold = alertThresholds[AlertType.PERFORMANCE_DEGRADATION]
-            if (trendThreshold != null && metrics.trend < -trendThreshold.criticalValue) {
-                triggerAlert(
-                    type = AlertType.PERFORMANCE_DEGRADATION,
-                    severity = AlertSeverity.HIGH,
-                    message = "Significant performance degradation detected: ${metrics.trend.toInt()}%",
-                    context = mapOf(
-                        "trend" to metrics.trend.toString(),
-                        "currentScore" to metrics.currentScore.toString(),
-                        "efficiency" to metrics.efficiency.toString()
-                    )
+        val performanceMetrics = diagnosticsProvider.get().getCurrentReport().performanceMetrics
+        val performanceScore = performanceMetrics["performance_score"] ?: 100L
+        
+        if (performanceScore < 60) {
+            triggerAlert(
+                type = AlertType.PERFORMANCE_DEGRADATION,
+                severity = if (performanceScore < 40) AlertSeverity.CRITICAL else AlertSeverity.HIGH,
+                message = "System performance degradation detected",
+                context = mapOf(
+                    "performanceScore" to performanceScore.toString(),
+                    "frameRate" to (performanceMetrics["frame_rate"] ?: 0L).toString(),
+                    "networkLatency" to (performanceMetrics["network_latency"] ?: 0L).toString(),
+                    "audioBufferHealth" to (performanceMetrics["audio_buffer_health"] ?: 0L).toString()
                 )
-            }
-            
-            // Check efficiency
-            val efficiencyThreshold = alertThresholds[AlertType.EFFICIENCY_LOW]
-            if (efficiencyThreshold != null && metrics.efficiency < efficiencyThreshold.criticalValue) {
-                triggerAlert(
-                    type = AlertType.EFFICIENCY_LOW,
-                    severity = AlertSeverity.MEDIUM,
-                    message = "System efficiency below acceptable level: ${(metrics.efficiency * 100).toInt()}%",
-                    context = mapOf(
-                        "efficiency" to metrics.efficiency.toString(),
-                        "threshold" to efficiencyThreshold.criticalValue.toString()
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            // Handle silently
+            )
         }
     }
     
     private suspend fun checkResourceUsage() {
-        try {
-            val resourceUsage = diagnosticsManager.getResourceUsage().first()
-            
-            // Memory usage check
-            val memoryThreshold = alertThresholds[AlertType.MEMORY_HIGH]
-            val memoryUsagePercent = resourceUsage.memoryUsed / resourceUsage.memoryTotal * 100
-            
-            if (memoryThreshold != null && memoryUsagePercent > memoryThreshold.criticalValue) {
-                triggerAlert(
+        val resourceUsage = diagnosticsProvider.get().getCurrentReport().resourceUsage
+        
+        checkMemoryUsage(resourceUsage)
+        checkCpuUsage(resourceUsage)
+        checkBatteryLevel(resourceUsage)
+        checkNetworkLatency(resourceUsage)
+    }
+    
+    private suspend fun checkMemoryUsage(resourceUsage: ResourceUsageSnapshot) {
+        val memoryUsagePercent = (resourceUsage.memoryUsed / resourceUsage.memoryTotal) * 100
+        
+        when {
+            memoryUsagePercent >= 90 -> {
+                createAlert(
                     type = AlertType.MEMORY_HIGH,
                     severity = AlertSeverity.CRITICAL,
-                    message = "Memory usage critically high: ${memoryUsagePercent.toInt()}%",
+                    message = "Critical memory usage: ${String.format("%.1f", memoryUsagePercent)}%",
                     context = mapOf(
-                        "memoryUsed" to resourceUsage.memoryUsed.toString(),
-                        "memoryTotal" to resourceUsage.memoryTotal.toString(),
-                        "usagePercent" to memoryUsagePercent.toString()
+                        "memoryUsed" to "${String.format("%.1f", resourceUsage.memoryUsed)}MB",
+                        "memoryTotal" to "${String.format("%.1f", resourceUsage.memoryTotal)}MB"
                     )
                 )
             }
-            
-            // CPU usage check
-            val cpuThreshold = alertThresholds[AlertType.CPU_HIGH]
-            if (cpuThreshold != null && resourceUsage.cpuUsage > cpuThreshold.criticalValue) {
-                triggerAlert(
+            memoryUsagePercent >= 80 -> {
+                createAlert(
+                    type = AlertType.MEMORY_HIGH,
+                    severity = AlertSeverity.MEDIUM,
+                    message = "High memory usage: ${String.format("%.1f", memoryUsagePercent)}%",
+                    context = mapOf(
+                        "memoryUsed" to "${String.format("%.1f", resourceUsage.memoryUsed)}MB",
+                        "memoryTotal" to "${String.format("%.1f", resourceUsage.memoryTotal)}MB"
+                    )
+                )
+            }
+        }
+    }
+
+    private suspend fun checkCpuUsage(resourceUsage: ResourceUsageSnapshot) {
+        when {
+            resourceUsage.cpuUsage >= 90 -> {
+                createAlert(
                     type = AlertType.CPU_HIGH,
-                    severity = AlertSeverity.HIGH,
-                    message = "CPU usage critically high: ${resourceUsage.cpuUsage.toInt()}%",
-                    context = mapOf(
-                        "cpuUsage" to resourceUsage.cpuUsage.toString(),
-                        "threshold" to cpuThreshold.criticalValue.toString()
-                    )
+                    severity = AlertSeverity.CRITICAL,
+                    message = "Critical CPU usage: ${String.format("%.1f", resourceUsage.cpuUsage)}%",
+                    context = mapOf("cpuUsage" to "${String.format("%.1f", resourceUsage.cpuUsage)}%")
                 )
             }
-            
-            // Battery check
-            val batteryThreshold = alertThresholds[AlertType.BATTERY_LOW]
-            if (batteryThreshold != null && resourceUsage.batteryLevel < batteryThreshold.criticalValue) {
-                triggerAlert(
+            resourceUsage.cpuUsage >= 80 -> {
+                createAlert(
+                    type = AlertType.CPU_HIGH,
+                    severity = AlertSeverity.MEDIUM,
+                    message = "High CPU usage: ${String.format("%.1f", resourceUsage.cpuUsage)}%",
+                    context = mapOf("cpuUsage" to "${String.format("%.1f", resourceUsage.cpuUsage)}%")
+                )
+            }
+        }
+    }
+
+    private suspend fun checkBatteryLevel(resourceUsage: ResourceUsageSnapshot) {
+        when {
+            resourceUsage.batteryLevel <= 10 -> {
+                createAlert(
+                    type = AlertType.BATTERY_LOW,
+                    severity = AlertSeverity.CRITICAL,
+                    message = "Critical battery level: ${String.format("%.1f", resourceUsage.batteryLevel)}%",
+                    context = mapOf("batteryLevel" to "${String.format("%.1f", resourceUsage.batteryLevel)}%")
+                )
+            }
+            resourceUsage.batteryLevel <= 20 -> {
+                createAlert(
                     type = AlertType.BATTERY_LOW,
                     severity = AlertSeverity.MEDIUM,
-                    message = "Battery level low: ${resourceUsage.batteryLevel.toInt()}%",
-                    context = mapOf(
-                        "batteryLevel" to resourceUsage.batteryLevel.toString(),
-                        "threshold" to batteryThreshold.criticalValue.toString()
-                    )
+                    message = "Low battery level: ${String.format("%.1f", resourceUsage.batteryLevel)}%",
+                    context = mapOf("batteryLevel" to "${String.format("%.1f", resourceUsage.batteryLevel)}%")
                 )
             }
-        } catch (e: Exception) {
-            // Handle silently
+        }
+    }
+
+    private suspend fun checkNetworkLatency(resourceUsage: ResourceUsageSnapshot) {
+        when {
+            resourceUsage.networkLatency >= 1000 -> {
+                createAlert(
+                    type = AlertType.NETWORK_LATENCY_HIGH,
+                    severity = AlertSeverity.CRITICAL,
+                    message = "Critical network latency: ${String.format("%.1f", resourceUsage.networkLatency)}ms",
+                    context = mapOf("latency" to "${String.format("%.1f", resourceUsage.networkLatency)}ms")
+                )
+            }
+            resourceUsage.networkLatency >= 500 -> {
+                createAlert(
+                    type = AlertType.NETWORK_LATENCY_HIGH,
+                    severity = AlertSeverity.MEDIUM,
+                    message = "High network latency: ${String.format("%.1f", resourceUsage.networkLatency)}ms",
+                    context = mapOf("latency" to "${String.format("%.1f", resourceUsage.networkLatency)}ms")
+                )
+            }
         }
     }
     
     private suspend fun checkNetworkHealth() {
-        try {
-            val resourceUsage = diagnosticsManager.getResourceUsage().first()
-            val networkThreshold = alertThresholds[AlertType.NETWORK_LATENCY_HIGH]
-            
-            if (networkThreshold != null && resourceUsage.networkLatency > networkThreshold.criticalValue) {
-                triggerAlert(
-                    type = AlertType.NETWORK_LATENCY_HIGH,
-                    severity = AlertSeverity.HIGH,
-                    message = "Network latency critically high: ${resourceUsage.networkLatency.toInt()}ms",
-                    context = mapOf(
-                        "latency" to resourceUsage.networkLatency.toString(),
-                        "threshold" to networkThreshold.criticalValue.toString()
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            // Handle silently
+        val resourceUsage = diagnosticsProvider.get().getCurrentReport().resourceUsage
+        
+        // Check network latency
+        if (resourceUsage.networkLatency > 200) {
+            triggerAlert(
+                type = AlertType.NETWORK_LATENCY_HIGH,
+                severity = if (resourceUsage.networkLatency > 500) AlertSeverity.CRITICAL else AlertSeverity.HIGH,
+                message = "High network latency detected: ${resourceUsage.networkLatency.toInt()}ms",
+                context = mapOf("networkLatency" to resourceUsage.networkLatency.toString())
+            )
         }
     }
     
@@ -485,7 +520,7 @@ class AlertingSystem @Inject constructor(
                 val existingAlert = findSimilarActiveAlert(type, context)
                 
                 if (existingAlert == null) {
-                    val alert = SimpleAlert(
+                    val alert = Alert(
                         id = generateAlertId(),
                         type = type,
                         severity = severity,
@@ -504,7 +539,7 @@ class AlertingSystem @Inject constructor(
         }
     }
     
-    private suspend fun processNewAlert(alert: SimpleAlert) {
+    private suspend fun processNewAlert(alert: Alert) {
         // Check suppression
         if (!isAlertSuppressed(alert)) {
             activeAlerts[alert.id] = alert
@@ -517,13 +552,13 @@ class AlertingSystem @Inject constructor(
             alertRateLimiter.incrementAndGet()
             
             // Emit alert update
-            _alertUpdates.value = SimpleAlertUpdate(
+            _alertUpdates.value = AlertUpdate(
                 alert = alert,
                 action = AlertAction.CREATED,
                 timestamp = System.currentTimeMillis()
             )
             
-            loggingManager.logEvent(
+            loggingProvider.get().logEvent(
                 LogEvent(
                     level = when (alert.severity) {
                         AlertSeverity.CRITICAL -> LogLevel.ERROR
@@ -533,7 +568,8 @@ class AlertingSystem @Inject constructor(
                     },
                     category = LogCategory.ALERT,
                     message = "Alert triggered: ${alert.type} - ${alert.message}",
-                    timestamp = System.currentTimeMillis()
+                    metadata = mapOf("alertId" to alert.id, "alertType" to alert.type.toString(), "severity" to alert.severity.toString()),
+                    component = ComponentType.SYSTEM
                 )
             )
         }
@@ -553,18 +589,19 @@ class AlertingSystem @Inject constructor(
                 activeAlerts.remove(alert.id)
                 recordAlertEvent(AlertEventType.AUTO_RESOLVED, updatedAlert)
                 
-                _alertUpdates.value = SimpleAlertUpdate(
+                _alertUpdates.value = AlertUpdate(
                     alert = updatedAlert,
                     action = AlertAction.AUTO_RESOLVED,
                     timestamp = System.currentTimeMillis()
                 )
                 
-                loggingManager.logEvent(
+                loggingProvider.get().logEvent(
                     LogEvent(
                         level = LogLevel.INFO,
                         category = LogCategory.ALERT,
                         message = "Alert auto-resolved: ${alert.id}",
-                        timestamp = System.currentTimeMillis()
+                        metadata = mapOf("alertId" to alert.id, "alertType" to alert.type.toString()),
+                        component = ComponentType.SYSTEM
                     )
                 )
             }
@@ -576,43 +613,43 @@ class AlertingSystem @Inject constructor(
     // =============================================================================
     
     private fun initializeDefaultThresholds() {
-        alertThresholds[AlertType.HEALTH_SCORE_LOW] = SimpleThreshold(
+        alertThresholds[AlertType.HEALTH_SCORE_LOW] = AlertThreshold(
             warningValue = 0.7,
             criticalValue = 0.5,
             enabled = true
         )
         
-        alertThresholds[AlertType.MEMORY_HIGH] = SimpleThreshold(
+        alertThresholds[AlertType.MEMORY_HIGH] = AlertThreshold(
             warningValue = 80.0,
             criticalValue = 90.0,
             enabled = true
         )
         
-        alertThresholds[AlertType.CPU_HIGH] = SimpleThreshold(
+        alertThresholds[AlertType.CPU_HIGH] = AlertThreshold(
             warningValue = 80.0,
             criticalValue = 95.0,
             enabled = true
         )
         
-        alertThresholds[AlertType.NETWORK_LATENCY_HIGH] = SimpleThreshold(
+        alertThresholds[AlertType.NETWORK_LATENCY_HIGH] = AlertThreshold(
             warningValue = 200.0,
             criticalValue = 500.0,
             enabled = true
         )
         
-        alertThresholds[AlertType.BATTERY_LOW] = SimpleThreshold(
+        alertThresholds[AlertType.BATTERY_LOW] = AlertThreshold(
             warningValue = 20.0,
             criticalValue = 10.0,
             enabled = true
         )
         
-        alertThresholds[AlertType.PERFORMANCE_DEGRADATION] = SimpleThreshold(
+        alertThresholds[AlertType.PERFORMANCE_DEGRADATION] = AlertThreshold(
             warningValue = 10.0,
             criticalValue = 25.0,
             enabled = true
         )
         
-        alertThresholds[AlertType.EFFICIENCY_LOW] = SimpleThreshold(
+        alertThresholds[AlertType.EFFICIENCY_LOW] = AlertThreshold(
             warningValue = 0.6,
             criticalValue = 0.4,
             enabled = true
@@ -620,17 +657,17 @@ class AlertingSystem @Inject constructor(
     }
     
     private fun initializeNotificationChannels() {
-        notificationChannels[NotificationChannel.IN_APP] = SimpleNotificationConfig(
+        notificationChannels[NotificationChannel.IN_APP] = NotificationConfig(
             enabled = true,
             severityFilter = setOf(AlertSeverity.CRITICAL, AlertSeverity.HIGH, AlertSeverity.MEDIUM, AlertSeverity.LOW)
         )
         
-        notificationChannels[NotificationChannel.SYSTEM] = SimpleNotificationConfig(
+        notificationChannels[NotificationChannel.SYSTEM] = NotificationConfig(
             enabled = true,
             severityFilter = setOf(AlertSeverity.CRITICAL, AlertSeverity.HIGH)
         )
         
-        notificationChannels[NotificationChannel.LOG] = SimpleNotificationConfig(
+        notificationChannels[NotificationChannel.LOG] = NotificationConfig(
             enabled = true,
             severityFilter = setOf(AlertSeverity.CRITICAL, AlertSeverity.HIGH, AlertSeverity.MEDIUM, AlertSeverity.LOW)
         )
@@ -640,7 +677,7 @@ class AlertingSystem @Inject constructor(
         return "alert_${System.currentTimeMillis()}_${(Math.random() * 1000).toInt()}"
     }
     
-    private fun findSimilarActiveAlert(type: AlertType, context: Map<String, String>): SimpleAlert? {
+    private fun findSimilarActiveAlert(type: AlertType, context: Map<String, String>): Alert? {
         return activeAlerts.values.find { alert ->
             alert.type == type && isSimilarContext(alert.context, context)
         }
@@ -651,7 +688,7 @@ class AlertingSystem @Inject constructor(
         return context1.keys.intersect(context2.keys).size >= context1.keys.size * 0.5
     }
     
-    private fun updateExistingAlert(alert: SimpleAlert, newContext: Map<String, String>) {
+    private fun updateExistingAlert(alert: Alert, newContext: Map<String, String>) {
         val updatedAlert = alert.copy(
             context = alert.context + newContext,
             lastUpdated = System.currentTimeMillis(),
@@ -662,7 +699,7 @@ class AlertingSystem @Inject constructor(
         recordAlertEvent(AlertEventType.UPDATED, updatedAlert)
     }
     
-    private fun isAlertSuppressed(alert: SimpleAlert): Boolean {
+    private fun isAlertSuppressed(alert: Alert): Boolean {
         val suppressionKey = "${alert.type}_${alert.context.hashCode()}"
         val suppressedUntil = suppressedAlerts[suppressionKey]
         return suppressedUntil != null && System.currentTimeMillis() < suppressedUntil
@@ -679,7 +716,7 @@ class AlertingSystem @Inject constructor(
         return alertRateLimiter.get() >= MAX_ALERTS_PER_HOUR
     }
     
-    private suspend fun sendNotifications(alert: SimpleAlert) {
+    private suspend fun sendNotifications(alert: Alert) {
         for ((channel, config) in notificationChannels) {
             if (config.enabled && alert.severity in config.severityFilter) {
                 when (channel) {
@@ -700,26 +737,26 @@ class AlertingSystem @Inject constructor(
         }
     }
     
-    private suspend fun shouldAutoResolve(alert: SimpleAlert): Boolean {
+    private suspend fun shouldAutoResolve(alert: Alert): Boolean {
         return when (alert.type) {
             AlertType.HEALTH_SCORE_LOW -> {
-                val currentHealth = diagnosticsManager.getCurrentHealthScore().first().overall
+                val currentHealth = diagnosticsProvider.get().getCurrentReport().systemHealth.overall
                 val threshold = alertThresholds[AlertType.HEALTH_SCORE_LOW]?.warningValue ?: 0.7
                 currentHealth > threshold
             }
             AlertType.MEMORY_HIGH -> {
-                val resourceUsage = diagnosticsManager.getResourceUsage().first()
+                val resourceUsage = diagnosticsProvider.get().getCurrentReport().resourceUsage
                 val memoryUsagePercent = resourceUsage.memoryUsed / resourceUsage.memoryTotal * 100
                 val threshold = alertThresholds[AlertType.MEMORY_HIGH]?.warningValue ?: 80.0
                 memoryUsagePercent < threshold
             }
             AlertType.CPU_HIGH -> {
-                val resourceUsage = diagnosticsManager.getResourceUsage().first()
+                val resourceUsage = diagnosticsProvider.get().getCurrentReport().resourceUsage
                 val threshold = alertThresholds[AlertType.CPU_HIGH]?.warningValue ?: 80.0
                 resourceUsage.cpuUsage < threshold
             }
             AlertType.NETWORK_LATENCY_HIGH -> {
-                val resourceUsage = diagnosticsManager.getResourceUsage().first()
+                val resourceUsage = diagnosticsProvider.get().getCurrentReport().resourceUsage
                 val threshold = alertThresholds[AlertType.NETWORK_LATENCY_HIGH]?.warningValue ?: 200.0
                 resourceUsage.networkLatency < threshold
             }
@@ -727,8 +764,8 @@ class AlertingSystem @Inject constructor(
         }
     }
     
-    private fun recordAlertEvent(eventType: AlertEventType, alert: SimpleAlert) {
-        val event = SimpleAlertEvent(
+    private fun recordAlertEvent(eventType: AlertEventType, alert: Alert) {
+        val event = AlertEvent(
             id = generateAlertId(),
             alertId = alert.id,
             type = eventType,
@@ -743,7 +780,7 @@ class AlertingSystem @Inject constructor(
     }
     
     private fun updateSystemStatus() {
-        _systemStatus.value = SimpleAlertingSystemStatus(
+        _systemStatus.value = AlertingSystemStatus(
             isMonitoring = isMonitoring.get(),
             activeAlertCount = activeAlerts.size,
             totalAlertsToday = getTodayAlertCount(),
@@ -771,7 +808,7 @@ class AlertingSystem @Inject constructor(
         }
     }
     
-    private fun calculateAverageResolutionTime(events: List<SimpleAlertEvent>): Long {
+    private fun calculateAverageResolutionTime(events: List<AlertEvent>): Long {
         val resolvedEvents = events.filter { 
             it.type == AlertEventType.RESOLVED || it.type == AlertEventType.AUTO_RESOLVED 
         }
@@ -792,7 +829,7 @@ class AlertingSystem @Inject constructor(
         } else 0L
     }
     
-    private fun getTopAlertTypes(events: List<SimpleAlertEvent>, limit: Int): List<Pair<AlertType, Int>> {
+    private fun getTopAlertTypes(events: List<AlertEvent>, limit: Int): List<Pair<AlertType, Int>> {
         return events
             .groupBy { it.alert.type }
             .mapValues { it.value.size }
@@ -807,66 +844,4 @@ class AlertingSystem @Inject constructor(
     }
 }
 
-// =============================================================================
-// SIMPLIFIED DATA MODELS
-// =============================================================================
-
-data class SimpleAlert(
-    val id: String,
-    val type: AlertType,
-    val severity: AlertSeverity,
-    val message: String,
-    val context: Map<String, String>,
-    val timestamp: Long,
-    val status: AlertStatus,
-    val acknowledgedBy: String? = null,
-    val acknowledgedAt: Long? = null,
-    val resolvedBy: String? = null,
-    val resolvedAt: Long? = null,
-    val resolution: String? = null,
-    val lastUpdated: Long? = null,
-    val occurrenceCount: Int = 1
-)
-
-data class SimpleThreshold(
-    val warningValue: Double,
-    val criticalValue: Double,
-    val enabled: Boolean = true
-)
-
-data class SimpleAlertEvent(
-    val id: String,
-    val alertId: String,
-    val type: AlertEventType,
-    val alert: SimpleAlert,
-    val timestamp: Long
-)
-
-data class SimpleAlertUpdate(
-    val alert: SimpleAlert,
-    val action: AlertAction,
-    val timestamp: Long
-)
-
-data class SimpleNotificationConfig(
-    val enabled: Boolean,
-    val severityFilter: Set<AlertSeverity>
-)
-
-data class SimpleAlertingSystemStatus(
-    val isMonitoring: Boolean = false,
-    val activeAlertCount: Int = 0,
-    val totalAlertsToday: Int = 0,
-    val lastAlertTime: Long? = null,
-    val systemHealth: Double = 1.0
-)
-
-data class SimpleAlertStatistics(
-    val totalActiveAlerts: Int,
-    val totalAlertsLast24h: Int,
-    val totalAlertsLast7d: Int,
-    val alertsByType: Map<AlertType, Int>,
-    val alertsBySeverity: Map<AlertSeverity, Int>,
-    val averageResolutionTime: Long,
-    val topAlertTypes: List<Pair<AlertType, Int>>
-) 
+ 

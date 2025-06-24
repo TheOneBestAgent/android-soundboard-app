@@ -1,5 +1,9 @@
 package com.soundboard.android.diagnostics
 
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+
 /**
  * Data models for the DiagnosticsManager component
  * Defines all the core data structures used for system health monitoring,
@@ -13,78 +17,85 @@ package com.soundboard.android.diagnostics
 /**
  * Types of system components that can be monitored
  */
+@Serializable
 enum class ComponentType {
-    CONNECTION_POOL,
-    CACHE,
-    COMPRESSION,
-    PIPELINE,
-    METRICS,
-    NETWORK,
-    SYSTEM
+    @SerialName("connection_pool") CONNECTION_POOL,
+    @SerialName("cache") CACHE,
+    @SerialName("compression") COMPRESSION,
+    @SerialName("pipeline") PIPELINE,
+    @SerialName("metrics") METRICS,
+    @SerialName("network") NETWORK,
+    @SerialName("system") SYSTEM
 }
 
 /**
  * Health status levels for components
  */
+@Serializable
 enum class ComponentStatus {
-    HEALTHY,
-    DEGRADED,
-    CRITICAL,
-    OFFLINE
+    @SerialName("healthy") HEALTHY,
+    @SerialName("degraded") DEGRADED,
+    @SerialName("critical") CRITICAL,
+    @SerialName("offline") OFFLINE
 }
 
 /**
  * Severity levels for bottlenecks and issues
  */
+@Serializable
 enum class Severity(val priority: Int) {
-    LOW(1),
-    MEDIUM(2),
-    HIGH(3),
-    CRITICAL(4)
+    @SerialName("low") LOW(1),
+    @SerialName("medium") MEDIUM(2),
+    @SerialName("high") HIGH(3),
+    @SerialName("critical") CRITICAL(4)
 }
 
 /**
  * Direction of trends in metrics
  */
+@Serializable
 enum class TrendDirection {
-    INCREASING,
-    DECREASING,
-    STABLE,
-    UNKNOWN
+    @SerialName("improving") IMPROVING,
+    @SerialName("decreasing") DECREASING,
+    @SerialName("stable") STABLE,
+    @SerialName("unknown") UNKNOWN
 }
 
 /**
  * Overall health trend assessment
  */
+@Serializable
 enum class HealthTrend {
-    IMPROVING,
-    STABLE,
-    DEGRADING,
-    CRITICAL
+    @SerialName("improving") IMPROVING,
+    @SerialName("stable") STABLE,
+    @SerialName("degrading") DEGRADING,
+    @SerialName("critical") CRITICAL
 }
 
 /**
  * Types of performance bottlenecks
  */
+@Serializable
 enum class BottleneckType {
-    COMPONENT_DEGRADATION,
-    MEMORY_PRESSURE,
-    CPU_SATURATION,
-    NETWORK_LATENCY,
-    DISK_IO,
-    MEMORY_LEAK,
-    THREAD_CONTENTION,
-    RESOURCE_EXHAUSTION
+    @SerialName("component_degradation") COMPONENT_DEGRADATION,
+    @SerialName("memory_pressure") MEMORY_PRESSURE,
+    @SerialName("cpu_saturation") CPU_SATURATION,
+    @SerialName("network_latency") NETWORK_LATENCY,
+    @SerialName("disk_io") DISK_IO,
+    @SerialName("memory_leak") MEMORY_LEAK,
+    @SerialName("thread_contention") THREAD_CONTENTION,
+    @SerialName("resource_exhaustion") RESOURCE_EXHAUSTION
 }
 
 /**
  * User impact levels
  */
+@Serializable
 enum class UserImpact {
-    LOW,
-    MEDIUM,
-    HIGH,
-    CRITICAL
+    @SerialName("low") LOW,
+    @SerialName("medium") MEDIUM,
+    @SerialName("high") HIGH,
+    @SerialName("critical") CRITICAL
 }
 
 // =============================================================================
@@ -94,63 +105,71 @@ enum class UserImpact {
 /**
  * Log levels for filtering and categorization
  */
+@Serializable
 enum class LogLevel(val priority: Int) {
-    TRACE(1),
-    DEBUG(2),
-    INFO(3),
-    WARN(4),
-    ERROR(5)
+    @SerialName("trace") TRACE(1),
+    @SerialName("debug") DEBUG(2),
+    @SerialName("info") INFO(3),
+    @SerialName("warn") WARN(4),
+    @SerialName("error") ERROR(5)
 }
 
 /**
  * Categories for structured logging
  */
+@Serializable
 enum class LogCategory {
-    PERFORMANCE,
-    NETWORK,
-    CACHE,
-    COMPRESSION,
-    ERROR,
-    USER_ACTION,
-    SYSTEM
+    @SerialName("performance") PERFORMANCE,
+    @SerialName("network") NETWORK,
+    @SerialName("cache") CACHE,
+    @SerialName("compression") COMPRESSION,
+    @SerialName("error") ERROR,
+    @SerialName("user_action") USER_ACTION,
+    @SerialName("user_interaction") USER_INTERACTION,
+    @SerialName("alert") ALERT,
+    @SerialName("system") SYSTEM
 }
 
 /**
  * Export formats for logs
  */
+@Serializable
 enum class ExportFormat {
-    JSON,
-    CSV,
-    TEXT,
-    XML
+    @SerialName("json") JSON,
+    @SerialName("csv") CSV,
+    @SerialName("text") TEXT,
+    @SerialName("xml") XML
 }
 
 /**
  * Types of log anomalies
  */
+@Serializable
 enum class AnomalyType {
-    ERROR_SPIKE,
-    UNUSUAL_SILENCE,
-    PERFORMANCE_DEGRADATION,
-    MEMORY_SPIKE,
-    NETWORK_ISSUES
+    @SerialName("error_spike") ERROR_SPIKE,
+    @SerialName("unusual_silence") UNUSUAL_SILENCE,
+    @SerialName("performance_degradation") PERFORMANCE_DEGRADATION,
+    @SerialName("memory_spike") MEMORY_SPIKE,
+    @SerialName("network_issues") NETWORK_ISSUES
 }
 
 /**
  * Log event structure for input
  */
+@Serializable
 data class LogEvent(
     val level: LogLevel,
     val category: LogCategory,
     val message: String,
-    val metadata: Map<String, Any>,
-    val correlationId: String? = null,
-    val component: ComponentType
+    val metadata: Map<String, String> = emptyMap(),
+    val component: ComponentType = ComponentType.SYSTEM,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 /**
  * Complete log entry with metadata
  */
+@Serializable
 data class LogEntry(
     val id: String,
     val timestamp: Long,
@@ -158,7 +177,7 @@ data class LogEntry(
     val category: LogCategory,
     val component: ComponentType,
     val message: String,
-    val metadata: Map<String, Any>,
+    val metadata: Map<String, String>,
     val correlationId: String?,
     val threadName: String,
     val formattedMessage: String
@@ -167,6 +186,7 @@ data class LogEntry(
 /**
  * Log filtering options
  */
+@Serializable
 data class LogFilter(
     val level: LogLevel? = null,
     val category: LogCategory? = null,
@@ -179,6 +199,7 @@ data class LogFilter(
 /**
  * Time range for log filtering
  */
+@Serializable
 data class TimeRange(
     val start: Long,
     val end: Long
@@ -187,14 +208,13 @@ data class TimeRange(
 /**
  * Detected log pattern
  */
+@Serializable
 data class LogPattern(
     val pattern: String,
-    val frequency: Int,
-    val severity: Severity,
-    val suggestedAction: String,
-    val firstOccurrence: Long,
-    val lastOccurrence: Long,
-    val affectedComponents: List<ComponentType>
+    val category: LogCategory,
+    val severity: LogLevel,
+    val occurrences: Int = 0,
+    val lastSeen: Long = System.currentTimeMillis()
 )
 
 /**
@@ -230,6 +250,20 @@ data class LogStatistics(
     }
 }
 
+/**
+ * Comprehensive logging report
+ */
+data class LoggingReport(
+    val timestamp: Long,
+    val totalLogs: Int,
+    val errorCount: Int,
+    val warningCount: Int,
+    val patterns: List<LogPattern>,
+    val anomalies: List<LogAnomaly>,
+    val logsByCategory: Map<LogCategory, Int>,
+    val logsByComponent: Map<ComponentType, Int>
+)
+
 // =============================================================================
 // HEALTH MONITORING DATA MODELS
 // =============================================================================
@@ -237,21 +271,22 @@ data class LogStatistics(
 /**
  * System health score with detailed breakdown
  */
+@Serializable
 data class HealthScore(
     val overall: Double,
     val components: Map<ComponentType, Double>,
     val timestamp: Long,
-    val factors: List<HealthFactor>,
-    val trend: HealthTrend,
+    val factors: List<String>,
+    val trend: TrendDirection,
     val confidence: Double
 ) {
     companion object {
-        fun initial(): HealthScore = HealthScore(
+        fun initial() = HealthScore(
             overall = 1.0,
-            components = ComponentType.values().associateWith { 1.0 },
+            components = emptyMap(),
             timestamp = System.currentTimeMillis(),
             factors = emptyList(),
-            trend = HealthTrend.STABLE,
+            trend = TrendDirection.STABLE,
             confidence = 1.0
         )
     }
@@ -261,28 +296,20 @@ data class HealthScore(
  * Factors contributing to health score
  */
 sealed class HealthFactor {
-    object CRITICAL_RESOURCE_USAGE : HealthFactor()
-    object HIGH_RESOURCE_USAGE : HealthFactor()
-    object CRITICAL_PERFORMANCE : HealthFactor()
-    object DEGRADED_PERFORMANCE : HealthFactor()
-    object NETWORK_ISSUES : HealthFactor()
-    object MEMORY_PRESSURE : HealthFactor()
-    object CPU_SATURATION : HealthFactor()
-    object DISK_ISSUES : HealthFactor()
-    
-    data class CRITICAL_COMPONENT_HEALTH(val component: ComponentType) : HealthFactor()
-    data class WARNING_COMPONENT_HEALTH(val component: ComponentType) : HealthFactor()
+    data class Critical(val component: ComponentType) : HealthFactor()
+    data class High(val component: ComponentType) : HealthFactor()
+    data class Medium(val component: ComponentType) : HealthFactor()
 }
 
 /**
  * Health data for individual components
  */
+@Serializable
 data class ComponentHealth(
+    val component: ComponentType,
     val score: Double,
-    val status: ComponentStatus,
-    val lastUpdated: Long,
-    val metrics: Map<String, Any>,
-    val issues: List<String>
+    val metrics: Map<String, Double>,
+    val timestamp: Long = System.currentTimeMillis()
 )
 
 /**
@@ -401,12 +428,15 @@ data class CorrelationReport(
  * Comprehensive diagnostic report
  */
 data class DiagnosticReport(
+    val id: String = java.util.UUID.randomUUID().toString(),
     val timestamp: Long,
     val systemHealth: HealthScore,
     val bottlenecks: List<Bottleneck>,
     val resourceUsage: ResourceUsageSnapshot,
-    val resourceTrends: ResourceTrends,
+    val resourceTrends: List<ResourceUsageSnapshot>,
     val recommendations: List<String>,
     val monitoringDuration: Long,
-    val diagnosticsOverhead: Double
+    val diagnosticsOverhead: Double,
+    val performanceMetrics: Map<String, Long> = emptyMap(),
+    val healthMetrics: Map<String, Long> = emptyMap()
 ) 

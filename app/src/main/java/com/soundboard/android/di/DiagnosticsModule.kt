@@ -1,16 +1,15 @@
 package com.soundboard.android.di
 
 import android.content.Context
-import com.soundboard.android.diagnostics.DiagnosticsManager
-import com.soundboard.android.diagnostics.LoggingManager
-import com.soundboard.android.diagnostics.PerformanceTuner
-import com.soundboard.android.diagnostics.AlertingSystem
+import com.soundboard.android.diagnostics.*
 import dagger.Module
 import dagger.Provides
+import dagger.Binds
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import dagger.Lazy
 
 /**
  * DiagnosticsModule - Provides Phase 4.3 Advanced Diagnostics & Monitoring components
@@ -23,36 +22,61 @@ import javax.inject.Singleton
  */
 @Module
 @InstallIn(SingletonComponent::class)
-object DiagnosticsModule {
+abstract class DiagnosticsModule {
     
-    @Provides
-    @Singleton
-    fun provideDiagnosticsManager(@ApplicationContext context: Context): DiagnosticsManager {
-        return DiagnosticsManager(context)
+    companion object {
+        @Provides
+        @Singleton
+        fun provideLoggingManager(
+            @ApplicationContext context: Context
+        ): LoggingManager {
+            return LoggingManager(context)
+        }
+        
+        @Provides
+        @Singleton
+        fun provideDiagnosticsManager(
+            @ApplicationContext context: Context,
+            loggingProvider: Lazy<LoggingProvider>
+        ): DiagnosticsManager {
+            return DiagnosticsManager(context, loggingProvider)
+        }
+        
+        @Provides
+        @Singleton
+        fun providePerformanceTuner(
+            @ApplicationContext context: Context,
+            diagnosticsProvider: Lazy<DiagnosticsProvider>,
+            loggingProvider: Lazy<LoggingProvider>
+        ): PerformanceTuner {
+            return PerformanceTuner(context, diagnosticsProvider, loggingProvider)
+        }
+        
+        @Provides
+        @Singleton
+        fun provideAlertingSystem(
+            @ApplicationContext context: Context,
+            diagnosticsProvider: Lazy<DiagnosticsProvider>,
+            loggingProvider: Lazy<LoggingProvider>,
+            performanceProvider: Lazy<PerformanceProvider>
+        ): AlertingSystem {
+            return AlertingSystem(context, diagnosticsProvider, loggingProvider, performanceProvider)
+        }
     }
-    
-    @Provides
+
+    @Binds
     @Singleton
-    fun provideLoggingManager(@ApplicationContext context: Context): LoggingManager {
-        return LoggingManager(context)
-    }
-    
-    @Provides
+    abstract fun bindLoggingProvider(loggingManager: LoggingManager): LoggingProvider
+
+    @Binds
     @Singleton
-    fun providePerformanceTuner(
-        diagnosticsManager: DiagnosticsManager,
-        loggingManager: LoggingManager
-    ): PerformanceTuner {
-        return PerformanceTuner(diagnosticsManager, loggingManager)
-    }
-    
-    @Provides
+    abstract fun bindDiagnosticsProvider(diagnosticsManager: DiagnosticsManager): DiagnosticsProvider
+
+    @Binds
     @Singleton
-    fun provideAlertingSystem(
-        diagnosticsManager: DiagnosticsManager,
-        loggingManager: LoggingManager,
-        performanceTuner: PerformanceTuner
-    ): AlertingSystem {
-        return AlertingSystem(diagnosticsManager, loggingManager, performanceTuner)
-    }
+    abstract fun bindPerformanceProvider(performanceTuner: PerformanceTuner): PerformanceProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindAlertingProvider(alertingSystem: AlertingSystem): AlertingProvider
 } 

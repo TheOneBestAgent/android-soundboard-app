@@ -152,6 +152,11 @@ class CompressionManager @Inject constructor() {
     )
     val compressionMetrics: StateFlow<CompressionMetrics> = _compressionMetrics.asStateFlow()
     
+    private var compressionLevel: Int = 6
+    private var compressionThreshold: Long = 1024 // 1KB
+    private var compressionAlgorithm: String = "GZIP"
+    private var adaptiveCompression: Boolean = true
+    
     /**
      * Initialize the compression manager
      */
@@ -244,7 +249,7 @@ class CompressionManager @Inject constructor() {
         val sample = data.take(sampleSize).toByteArray()
         
         // Check for text patterns
-        val textRatio = sample.count { it in 32..126 || it in listOf(9, 10, 13) }.toDouble() / sampleSize
+        val textRatio = sample.count { it in 32..126 || it in listOf<Byte>(9, 10, 13) }.toDouble() / sampleSize
         if (textRatio > 0.8) {
             // Check for JSON patterns
             val jsonPatterns = listOf('{', '}', '[', ']', '"', ':').map { it.code.toByte() }
@@ -465,5 +470,21 @@ class CompressionManager @Inject constructor() {
             compressionEfficiency = efficiency,
             algorithmUsage = algorithmUsage
         )
+    }
+
+    fun setCompressionLevel(level: Int) {
+        compressionLevel = level
+    }
+
+    fun setCompressionThreshold(threshold: Long) {
+        compressionThreshold = threshold
+    }
+
+    fun setCompressionAlgorithm(algorithm: String) {
+        compressionAlgorithm = algorithm
+    }
+
+    fun setAdaptiveCompression(adaptive: Boolean) {
+        adaptiveCompression = adaptive
     }
 }

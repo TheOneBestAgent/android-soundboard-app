@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
+import dagger.Lazy
 
 /**
  * LoggingManager - Advanced logging and analysis system
@@ -33,7 +34,7 @@ import javax.inject.Singleton
 @Singleton
 class LoggingManager @Inject constructor(
     @ApplicationContext private val context: Context
-) {
+) : LoggingProvider {
     companion object {
         private const val MAX_MEMORY_LOGS = 10_000
         private const val MAX_LOG_FILE_SIZE_MB = 10
@@ -86,10 +87,22 @@ class LoggingManager @Inject constructor(
     private var logCleanupJob: Job? = null
     private var isInitialized = false
 
+    private val _logEvents = MutableStateFlow<List<LogEvent>>(emptyList())
+    val logEvents: StateFlow<List<LogEvent>> = _logEvents.asStateFlow()
+
+    private val _logPatterns = MutableStateFlow<List<LogPattern>>(emptyList())
+    val logPatterns: StateFlow<List<LogPattern>> = _logPatterns.asStateFlow()
+
+    init {
+        scope.launch {
+            initialize()
+        }
+    }
+
     /**
      * Initialize the logging manager
      */
-    suspend fun initialize() {
+    private suspend fun initialize() {
         if (isInitialized) return
         
         setupFileLogging()
@@ -103,9 +116,9 @@ class LoggingManager @Inject constructor(
             category = LogCategory.SYSTEM,
             message = "LoggingManager initialized successfully",
             metadata = mapOf(
-                "maxMemoryLogs" to MAX_MEMORY_LOGS,
-                "fileLogging" to enableFileLogging,
-                "patternDetection" to enablePatternDetection
+                "maxMemoryLogs" to MAX_MEMORY_LOGS.toString(),
+                "fileLogging" to enableFileLogging.toString(),
+                "patternDetection" to enablePatternDetection.toString()
             ),
             component = ComponentType.SYSTEM
         ))
@@ -137,9 +150,35 @@ class LoggingManager @Inject constructor(
     // =============================================================================
 
     /**
+     * Log an error message with optional throwable
+     */
+    override suspend fun logError(message: String, error: Throwable?) {
+        logEvent(LogEvent(
+            level = LogLevel.ERROR,
+            category = LogCategory.SYSTEM,
+            component = ComponentType.SYSTEM,
+            message = message,
+            metadata = error?.let { mapOf("exception" to it.toString()) } ?: emptyMap()
+        ))
+    }
+
+    /**
+     * Log an info message with optional metadata
+     */
+    override suspend fun logInfo(message: String, metadata: Map<String, Any>) {
+        logEvent(LogEvent(
+            level = LogLevel.INFO,
+            category = LogCategory.SYSTEM,
+            component = ComponentType.SYSTEM,
+            message = message,
+            metadata = metadata.mapValues { it.value.toString() }
+        ))
+    }
+
+    /**
      * Log a structured event
      */
-    suspend fun logEvent(event: LogEvent) {
+    override suspend fun logEvent(event: LogEvent) {
         if (!shouldLog(event.level)) return
         
         val entry = LogEntry(
@@ -150,7 +189,7 @@ class LoggingManager @Inject constructor(
             component = event.component,
             message = event.message,
             metadata = event.metadata,
-            correlationId = event.correlationId,
+            correlationId = null,
             threadName = Thread.currentThread().name,
             formattedMessage = formatLogMessage(event)
         )
@@ -183,13 +222,32 @@ class LoggingManager @Inject constructor(
         if (enablePatternDetection) {
             checkForImmediatePatterns(entry)
         }
+
+        val currentEvents = _logEvents.value.toMutableList()
+        currentEvents.add(event)
+        _logEvents.value = currentEvents
     }
 
     /**
      * Log with correlation ID for request tracking
      */
     suspend fun logWithCorrelation(correlationId: String, event: LogEvent) {
-        logEvent(event.copy(correlationId = correlationId))
+        logEvent(event)
+        // Store correlation ID separately if needed
+        correlationGroups.getOrPut(correlationId) { mutableListOf() }.add(
+            LogEntry(
+                id = generateLogId(),
+                timestamp = System.currentTimeMillis(),
+                level = event.level,
+                category = event.category,
+                component = event.component,
+                message = event.message,
+                metadata = event.metadata,
+                correlationId = correlationId,
+                threadName = Thread.currentThread().name,
+                formattedMessage = formatLogMessage(event)
+            )
+        )
     }
 
     /**
@@ -281,8 +339,8 @@ class LoggingManager @Inject constructor(
             category = LogCategory.SYSTEM,
             message = "Log cleanup completed",
             metadata = mapOf(
-                "cutoffTime" to cutoffTime,
-                "remainingLogs" to memoryLogs.size
+                "cutoffTime" to cutoffTime.toString(),
+                "remainingLogs" to memoryLogs.size.toString()
             ),
             component = ComponentType.SYSTEM
         ))
@@ -548,16 +606,14 @@ class LoggingManager @Inject constructor(
                 patterns.add(
                     LogPattern(
                         pattern = pattern,
-                        frequency = logs.size,
+                        category = LogCategory.SYSTEM,
                         severity = when {
-                            logs.size >= 10 -> Severity.CRITICAL
-                            logs.size >= 5 -> Severity.HIGH
-                            else -> Severity.MEDIUM
+                            logs.size >= 10 -> LogLevel.ERROR
+                            logs.size >= 5 -> LogLevel.WARN
+                            else -> LogLevel.INFO
                         },
-                        suggestedAction = generatePatternAction(pattern, logs),
-                        firstOccurrence = logs.minOfOrNull { it.timestamp } ?: 0,
-                        lastOccurrence = logs.maxOfOrNull { it.timestamp } ?: 0,
-                        affectedComponents = logs.map { it.component }.distinct()
+                        occurrences = logs.size,
+                        lastSeen = logs.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
                     )
                 )
             }
@@ -569,18 +625,16 @@ class LoggingManager @Inject constructor(
                 patterns.add(
                     LogPattern(
                         pattern = pattern,
-                        frequency = logs.size,
-                        severity = Severity.MEDIUM,
-                        suggestedAction = "Review performance optimization for this operation",
-                        firstOccurrence = logs.minOfOrNull { it.timestamp } ?: 0,
-                        lastOccurrence = logs.maxOfOrNull { it.timestamp } ?: 0,
-                        affectedComponents = logs.map { it.component }.distinct()
+                        category = LogCategory.PERFORMANCE,
+                        severity = LogLevel.WARN,
+                        occurrences = logs.size,
+                        lastSeen = logs.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
                     )
                 )
             }
         }
         
-        _detectedPatterns.value = patterns.sortedByDescending { it.severity.priority }
+        _detectedPatterns.value = patterns.sortedByDescending { it.occurrences }
     }
 
     private fun generatePatternAction(pattern: String, logs: List<LogEntry>): String {
@@ -610,19 +664,17 @@ class LoggingManager @Inject constructor(
         return messagePatterns.filter { it.value.size >= 2 }.map { (pattern, entries) ->
             LogPattern(
                 pattern = pattern,
-                frequency = entries.size,
+                category = entries.firstOrNull()?.category ?: LogCategory.SYSTEM,
                 severity = when {
-                    entries.any { it.level == LogLevel.ERROR } && entries.size >= 5 -> Severity.CRITICAL
-                    entries.any { it.level == LogLevel.ERROR } -> Severity.HIGH
-                    entries.size >= 10 -> Severity.MEDIUM
-                    else -> Severity.LOW
+                    entries.any { it.level == LogLevel.ERROR } && entries.size >= 5 -> LogLevel.ERROR
+                    entries.any { it.level == LogLevel.ERROR } -> LogLevel.WARN
+                    entries.size >= 10 -> LogLevel.INFO
+                    else -> LogLevel.DEBUG
                 },
-                suggestedAction = generatePatternAction(pattern, entries),
-                firstOccurrence = entries.minOfOrNull { it.timestamp } ?: 0,
-                lastOccurrence = entries.maxOfOrNull { it.timestamp } ?: 0,
-                affectedComponents = entries.map { it.component }.distinct()
+                occurrences = entries.size,
+                lastSeen = entries.maxOfOrNull { it.timestamp } ?: System.currentTimeMillis()
             )
-        }.sortedByDescending { it.frequency }
+        }.sortedByDescending { it.occurrences }
     }
 
     private fun detectAnomalies(logs: List<LogEntry>): List<LogAnomaly> {
@@ -660,6 +712,73 @@ class LoggingManager @Inject constructor(
             )
         }
         
+        // Detect performance degradation
+        val performanceLogs = logs.filter { it.category == LogCategory.PERFORMANCE }
+        val performanceIssues = performanceLogs.count { log ->
+            log.message.contains("slow", ignoreCase = true) ||
+            log.message.contains("latency", ignoreCase = true) ||
+            log.message.contains("timeout", ignoreCase = true)
+        }
+        if (performanceIssues > 5) { // Threshold for performance issues
+            anomalies.add(
+                LogAnomaly(
+                    type = AnomalyType.PERFORMANCE_DEGRADATION,
+                    description = "Multiple performance issues detected",
+                    severity = Severity.HIGH,
+                    timestamp = System.currentTimeMillis(),
+                    affectedLogs = performanceIssues,
+                    suggestedAction = "Review system performance and optimize critical operations"
+                )
+            )
+        }
+        
+        // Detect memory spikes
+        val memoryLogs = logs.filter { log ->
+            log.category == LogCategory.PERFORMANCE &&
+            log.message.contains("memory", ignoreCase = true)
+        }
+        val memoryIssues = memoryLogs.count { log ->
+            log.message.contains("high", ignoreCase = true) ||
+            log.message.contains("exceeded", ignoreCase = true) ||
+            log.message.contains("leak", ignoreCase = true)
+        }
+        if (memoryIssues > 3) { // Threshold for memory issues
+            anomalies.add(
+                LogAnomaly(
+                    type = AnomalyType.MEMORY_SPIKE,
+                    description = "Memory usage anomalies detected",
+                    severity = Severity.HIGH,
+                    timestamp = System.currentTimeMillis(),
+                    affectedLogs = memoryIssues,
+                    suggestedAction = "Check for memory leaks and optimize memory usage"
+                )
+            )
+        }
+        
+        // Detect network issues
+        val networkLogs = logs.filter { log ->
+            log.category == LogCategory.NETWORK ||
+            log.message.contains("network", ignoreCase = true) ||
+            log.message.contains("connection", ignoreCase = true)
+        }
+        val networkIssues = networkLogs.count { log ->
+            log.message.contains("failed", ignoreCase = true) ||
+            log.message.contains("timeout", ignoreCase = true) ||
+            log.message.contains("error", ignoreCase = true)
+        }
+        if (networkIssues > 5) { // Threshold for network issues
+            anomalies.add(
+                LogAnomaly(
+                    type = AnomalyType.NETWORK_ISSUES,
+                    description = "Network connectivity issues detected",
+                    severity = Severity.HIGH,
+                    timestamp = System.currentTimeMillis(),
+                    affectedLogs = networkIssues,
+                    suggestedAction = "Check network connectivity and server status"
+                )
+            )
+        }
+        
         return anomalies
     }
 
@@ -692,12 +811,12 @@ class LoggingManager @Inject constructor(
     /**
      * Get recent patterns for UI display
      */
-    fun getRecentPatterns(): Flow<List<LogPattern>> = detectedPatterns.asStateFlow()
+    fun getRecentPatterns(): Flow<List<LogPattern>> = detectedPatterns
 
     /**
      * Get recent anomalies for UI display
      */
-    fun getRecentAnomalies(): Flow<List<LogAnomaly>> = detectedAnomalies.asStateFlow()
+    fun getRecentAnomalies(): Flow<List<LogAnomaly>> = detectedAnomalies
 
     /**
      * Clear all logs from memory and storage
@@ -711,20 +830,18 @@ class LoggingManager @Inject constructor(
         _detectedAnomalies.value = emptyList()
     }
 
-    /**
-     * Generate comprehensive diagnostic report
-     */
-    suspend fun generateReport(): LoggingReport {
-        val currentLogs = memoryLogs.toList()
-        return LoggingReport(
-            timestamp = System.currentTimeMillis(),
-            totalLogs = currentLogs.size,
-            errorCount = currentLogs.count { it.level == LogLevel.ERROR },
-            warningCount = currentLogs.count { it.level == LogLevel.WARN },
-            patterns = _detectedPatterns.value,
-            anomalies = _detectedAnomalies.value,
-            logsByCategory = currentLogs.groupBy { it.category }.mapValues { it.value.size },
-            logsByComponent = currentLogs.groupBy { it.component }.mapValues { it.value.size }
+    private fun getSystemInfo(): Map<String, String> {
+        return mapOf(
+            "platform" to "Android",
+            "apiLevel" to android.os.Build.VERSION.SDK_INT.toString(),
+            "device" to android.os.Build.MODEL,
+            "manufacturer" to android.os.Build.MANUFACTURER
         )
     }
-} 
+
+    fun addPattern(pattern: LogPattern) {
+        val currentPatterns = _logPatterns.value.toMutableList()
+        currentPatterns.add(pattern)
+        _logPatterns.value = currentPatterns
+    }
+}

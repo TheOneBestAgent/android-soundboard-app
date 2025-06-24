@@ -39,17 +39,16 @@ class CacheManager @Inject constructor() {
     
     // Cache entry representation
     data class CacheEntry<T>(
-        val key: String,
-        val data: T,
-        val size: Long,
-        val createdTimestamp: Long,
-        val lastAccessedTimestamp: Long,
-        val accessCount: Long,
-        val ttl: Long, // Time to live in milliseconds
-        val priority: CachePriority,
-        val compressionLevel: CompressionLevel,
-        val tags: Set<String> = emptySet()
-    )
+        val value: T,
+        val timestamp: Long,
+        val ttl: Long,
+        val tags: Set<String> = emptySet(),
+        val size: Long = 0,
+        val priority: CachePriority = CachePriority.NORMAL,
+        val accessCount: Long = 0
+    ) {
+        fun isExpired(): Boolean = System.currentTimeMillis() - timestamp > ttl
+    }
     
     enum class CachePriority(val weight: Double) {
         LOW(0.2),
@@ -160,6 +159,11 @@ class CacheManager @Inject constructor() {
     private val _prefetchRecommendations = MutableStateFlow<List<PrefetchRecommendation>>(emptyList())
     val prefetchRecommendations: StateFlow<List<PrefetchRecommendation>> = _prefetchRecommendations.asStateFlow()
     
+    private var cacheSize: Int = 1000
+    private var maxSize: Int = 10000
+    private var evictionPolicy: String = "LRU"
+    private var ttl: Long = 3600000 // 1 hour in milliseconds
+    
     /**
      * Initialize the cache manager
      */
@@ -186,20 +190,21 @@ class CacheManager @Inject constructor() {
             
             if (entry != null) {
                 // Check if entry is still valid
-                if (isEntryValid(entry)) {
+                @Suppress("UNCHECKED_CAST")
+                if (isEntryValid(entry as CacheEntry<Any>)) {
                     // Update access statistics
                     updateAccessPattern(key)
                     // Update entry in cache with new statistics
                     // Update entry access statistics
                     @Suppress("UNCHECKED_CAST")
-                    cache[key] = (entry as CacheEntry<Any>).copy(
-                        lastAccessedTimestamp = System.currentTimeMillis(),
-                        accessCount = entry.accessCount + 1
+                    val updatedEntry = entry.copy(
+                        timestamp = System.currentTimeMillis()
                     )
+                    cache[key] = updatedEntry as CacheEntry<Any>
                     
                     cacheHits.incrementAndGet()
                     @Suppress("UNCHECKED_CAST")
-                    entry.data as T
+                    entry.value as T
                 } else {
                     // Entry expired, remove it
                     cache.remove(key)
@@ -236,24 +241,19 @@ class CacheManager @Inject constructor() {
                 evictItemsToMakeSpace(size)
             }
             
-            // Determine compression level
-            val compressionLevel = determineCompressionLevel(size)
-            
             // Create cache entry
             val entry = CacheEntry(
-                key = key,
-                data = data as Any,
-                size = size,
-                createdTimestamp = System.currentTimeMillis(),
-                lastAccessedTimestamp = System.currentTimeMillis(),
-                accessCount = 1L,
+                value = data,
+                timestamp = System.currentTimeMillis(),
                 ttl = ttl,
+                tags = tags,
+                size = size,
                 priority = priority,
-                compressionLevel = compressionLevel,
-                tags = tags
+                accessCount = 0
             )
             
-            cache[key] = entry
+            @Suppress("UNCHECKED_CAST")
+            cache[key] = entry as CacheEntry<Any>
             updateAccessPattern(key)
         }
         
@@ -279,9 +279,9 @@ class CacheManager @Inject constructor() {
      */
     suspend fun clearByTags(tags: Set<String>) {
         cacheMutex.withLock {
-            val keysToRemove = cache.values
-                .filter { entry -> entry.tags.any { it in tags } }
-                .map { it.key }
+            val keysToRemove = cache.entries
+                .filter { (_, entry) -> entry.tags.any { tag -> tag in tags } }
+                .map { (key, _) -> key }
             
             keysToRemove.forEach { key ->
                 cache.remove(key)
@@ -394,38 +394,32 @@ class CacheManager @Inject constructor() {
         _prefetchRecommendations.value = topRecommendations
     }
     
-    private fun evictItemsToMakeSpace(requiredSpace: Long) {
-        val targetSize = cacheConfiguration.maxSizeBytes - requiredSpace
-        var currentSize = getCurrentCacheSize()
-        
-        if (currentSize <= targetSize) return
-        
-        val candidates = when (cacheConfiguration.evictionStrategy) {
-            EvictionStrategy.LRU -> cache.values.sortedBy { it.lastAccessedTimestamp }
-            EvictionStrategy.LFU -> cache.values.sortedBy { it.accessCount }
-            EvictionStrategy.WEIGHTED_LRU -> cache.values.sortedBy { 
-                it.lastAccessedTimestamp * it.priority.weight 
-            }
-            EvictionStrategy.ADAPTIVE -> cache.values.sortedWith(
-                compareBy<CacheEntry<Any>> { it.priority.weight }
-                    .thenBy { it.accessCount }
-                    .thenBy { it.lastAccessedTimestamp }
+    private suspend fun evictItemsToMakeSpace(requiredSize: Long) {
+        // Sort items by priority (lowest first), then by access count (lowest first)
+        val itemsToEvict = cache.entries
+            .sortedWith(
+                compareBy<Map.Entry<String, CacheEntry<Any>>> { it.value.priority }
+                    .thenBy { it.value.accessCount }
             )
+            
+        var freedSpace = 0L
+        val keysToRemove = mutableListOf<String>()
+        
+        for (entry in itemsToEvict) {
+            keysToRemove.add(entry.key)
+            freedSpace += entry.value.size
+            if (freedSpace >= requiredSize) break
         }
         
-        candidates.forEach { entry ->
-            if (currentSize <= targetSize) return
-            
-            cache.remove(entry.key)
-            accessPatterns.remove(entry.key)
-            currentSize -= entry.size
-            evictionCount.incrementAndGet()
+        keysToRemove.forEach { key ->
+            cache.remove(key)
+            accessPatterns.remove(key)
         }
     }
     
     private fun isEntryValid(entry: CacheEntry<Any>): Boolean {
         val currentTime = System.currentTimeMillis()
-        return currentTime <= entry.createdTimestamp + entry.ttl
+        return currentTime <= entry.timestamp + entry.ttl
     }
     
     private fun updateAccessPattern(key: String) {
@@ -510,5 +504,21 @@ class CacheManager @Inject constructor() {
             averageAccessTime = averageAccessTime,
             memoryEfficiency = memoryEfficiency
         )
+    }
+
+    fun setCacheSize(size: Int) {
+        cacheSize = size
+    }
+
+    fun setCacheMaxSize(size: Int) {
+        maxSize = size
+    }
+
+    fun setCacheEvictionPolicy(policy: String) {
+        evictionPolicy = policy
+    }
+
+    fun setCacheTtl(ttlMs: Long) {
+        ttl = ttlMs
     }
 }

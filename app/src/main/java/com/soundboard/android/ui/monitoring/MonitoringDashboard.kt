@@ -35,9 +35,27 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soundboard.android.diagnostics.*
+import com.soundboard.android.data.model.AlertEvent as UIAlertEvent
+import com.soundboard.android.data.model.SystemStatus
+import com.soundboard.android.data.model.AlertStatistics as UIAlertStatistics
+import com.soundboard.android.data.model.HealthTrend
+import com.soundboard.android.data.model.TrendDirection
+import com.soundboard.android.data.model.ResourceTrends
+import com.soundboard.android.data.model.ComponentHealth
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import kotlin.math.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.*
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 /**
  * MonitoringDashboard - Real-time system monitoring and diagnostics UI
@@ -54,93 +72,155 @@ import kotlin.math.*
  * - Export capabilities and diagnostic actions
  * - Responsive Material Design 3 interface
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MonitoringDashboard(
-    viewModel: MonitoringViewModel = hiltViewModel(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: MonitoringViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val systemStatus by viewModel.systemStatus.collectAsState(SystemStatus())
+    val alertUpdates by viewModel.alertUpdates.collectAsState(emptyList())
+    val alertHistory by viewModel.alertHistory.collectAsState(emptyList())
+    val alertStatistics by viewModel.alertStatistics.collectAsState(UIAlertStatistics())
     
-    LazyColumn(
+    val scope = rememberCoroutineScope()
+    
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(16.dp)
     ) {
-        item {
-            MonitoringHeader(
-                healthScore = uiState.healthScore,
-                onRefresh = { viewModel.refreshData() },
-                onExport = { viewModel.exportDiagnosticReport() }
-            )
-        }
-        
-        item {
-            SystemHealthOverview(
-                healthScore = uiState.healthScore,
-                resourceUsage = uiState.resourceUsage
-            )
-        }
-        
-        item {
-            QuickStatsRow(
-                stats = uiState.quickStats
-            )
-        }
-        
-        item {
-            RealTimeMetricsSection(
-                resourceUsage = uiState.resourceUsage,
-                trends = uiState.resourceTrends
-            )
-        }
-        
-        item {
-            ComponentHealthGrid(
-                componentHealth = uiState.componentHealth,
-                onComponentClick = { component -> 
-                    viewModel.showComponentDetails(component) 
+        // System Status Card
+        ElevatedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "System Status",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    StatusItem(
+                        title = "Active Alerts",
+                        value = systemStatus.activeAlertCount.toString(),
+                        color = if (systemStatus.activeAlertCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                    
+                    StatusItem(
+                        title = "Last 24h",
+                        value = alertStatistics.totalAlertsLast24h.toString(),
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    
+                    StatusItem(
+                        title = "Resolution Time",
+                        value = "${alertStatistics.averageResolutionTimeMinutes}m",
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
                 }
-            )
+            }
         }
         
-        if (uiState.bottlenecks.isNotEmpty()) {
-            item {
-                BottlenecksSection(
-                    bottlenecks = uiState.bottlenecks,
-                    onBottleneckClick = { bottleneck -> 
-                        viewModel.showBottleneckDetails(bottleneck) 
+        // Alert History
+        ElevatedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Alert History",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                LazyColumn {
+                    items(alertHistory) { event ->
+                        AlertHistoryItem(event = event)
+                        Divider()
                     }
-                )
+                }
             }
-        }
-        
-        if (uiState.logPatterns.isNotEmpty()) {
-            item {
-                LogPatternsSection(
-                    patterns = uiState.logPatterns,
-                    anomalies = uiState.logAnomalies
-                )
-            }
-        }
-        
-        item {
-            PerformanceTrendsChart(
-                trends = uiState.performanceTrends,
-                modifier = Modifier.height(200.dp)
-            )
-        }
-        
-        item {
-            DiagnosticActionsPanel(
-                onRunDiagnostics = { viewModel.runFullDiagnostics() },
-                onClearLogs = { viewModel.clearLogs() },
-                onOptimizePerformance = { viewModel.optimizePerformance() },
-                onGenerateReport = { viewModel.generateDetailedReport() }
-            )
         }
     }
+}
+
+@Composable
+private fun StatusItem(
+    title: String,
+    value: String,
+    color: Color
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun AlertHistoryItem(
+    event: UIAlertEvent
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = event.alert.message,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            Text(
+                text = "${event.alert.type} - ${event.alert.severity}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        Text(
+            text = formatTimestamp(event.timestamp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun formatTimestamp(timestamp: Long): String {
+    // TODO: Implement proper timestamp formatting
+    return timestamp.toString()
 }
 
 // =============================================================================
@@ -239,7 +319,11 @@ private fun SystemHealthOverview(
                 HealthScoreIndicator(
                     label = "Overall Health",
                     score = healthScore.overall,
-                    trend = healthScore.trend,
+                    trend = when(healthScore.trend) {
+                        com.soundboard.android.diagnostics.TrendDirection.STABLE -> HealthTrend.STABLE
+                        com.soundboard.android.diagnostics.TrendDirection.DECREASING -> HealthTrend.DEGRADING
+                        else -> HealthTrend.IMPROVING
+                    },
                     modifier = Modifier.weight(1f)
                 )
                 
@@ -678,7 +762,7 @@ private fun ComponentHealthCard(
         colors = CardDefaults.cardColors(
             containerColor = statusColor.copy(alpha = 0.1f)
         ),
-        border = androidx.compose.foundation.BorderStroke(2.dp, statusColor.copy(alpha = 0.3f))
+        border = BorderStroke(2.dp, statusColor.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -845,7 +929,7 @@ private fun BottleneckItem(
                 )
             }
             
-            Chip(
+            AssistChip(
                 onClick = onClick,
                 label = { Text(bottleneck.severity.name) },
                 colors = AssistChipDefaults.assistChipColors(
@@ -999,6 +1083,97 @@ private fun DiagnosticActionsPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StatusChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(text) },
+        enabled = enabled,
+        modifier = modifier.padding(4.dp),
+        border = AssistChipDefaults.assistChipBorder(
+            borderColor = MaterialTheme.colorScheme.primary,
+            borderWidth = 1.dp
+        )
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Chip(
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    labelTextStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    shape: Shape = MaterialTheme.shapes.small,
+    elevation: CardElevation = CardDefaults.cardElevation(),
+    border: BorderStroke? = null,
+    minHeight: Dp = 32.dp,
+    paddingValues: PaddingValues = PaddingValues(horizontal = 8.dp),
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.defaultMinSize(minHeight = minHeight),
+        enabled = enabled,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = if (enabled) 2.dp else 0.dp,
+        shadowElevation = if (enabled) 2.dp else 0.dp,
+        border = border,
+        interactionSource = interactionSource
+    ) {
+        ChipContent(
+            label = label,
+            labelTextStyle = labelTextStyle,
+            labelColor = labelColor,
+            leadingIcon = leadingIcon,
+            trailingIcon = trailingIcon,
+            paddingValues = paddingValues
+        )
+    }
+}
+
+@Composable
+private fun ChipContent(
+    label: String,
+    labelTextStyle: TextStyle,
+    labelColor: Color,
+    leadingIcon: @Composable (() -> Unit)?,
+    trailingIcon: @Composable (() -> Unit)?,
+    paddingValues: PaddingValues
+) {
+    Row(
+        Modifier.padding(paddingValues),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (leadingIcon != null) {
+            leadingIcon()
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(
+            text = label,
+            style = labelTextStyle,
+            color = labelColor
+        )
+        if (trailingIcon != null) {
+            Spacer(Modifier.width(8.dp))
+            trailingIcon()
         }
     }
 } 

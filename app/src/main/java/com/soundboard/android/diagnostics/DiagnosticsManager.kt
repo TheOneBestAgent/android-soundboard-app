@@ -11,6 +11,9 @@ import javax.inject.Singleton
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import dagger.Lazy
 
 /**
  * DiagnosticsManager - Core system health monitoring and diagnostics
@@ -28,8 +31,9 @@ import kotlin.time.Duration.Companion.minutes
  */
 @Singleton
 class DiagnosticsManager @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
+    @ApplicationContext private val context: Context,
+    private val loggingProvider: Lazy<LoggingProvider>
+) : DiagnosticsProvider {
     companion object {
         private const val MONITORING_INTERVAL_MS = 30_000L // 30 seconds
         private const val HEALTH_HISTORY_RETENTION_HOURS = 24
@@ -67,14 +71,38 @@ class DiagnosticsManager @Inject constructor(
     private val diagnosticsOverhead = AtomicLong(0)
     private val healthComputations = AtomicLong(0)
 
+    private val healthMetrics = ConcurrentHashMap<String, AtomicLong>()
+    private val performanceMetrics = ConcurrentHashMap<String, AtomicLong>()
+    private val diagnosticEvents = MutableSharedFlow<DiagnosticEvent>()
+    
+    // Health check intervals
+    private val systemHealthInterval = 30.seconds
+    private val performanceCheckInterval = 1.minutes
+    private val diagnosticReportInterval = 5.minutes
+    
+    init {
+        scope.launch {
+            initialize()
+        }
+    }
+
     /**
      * Initialize diagnostic monitoring
      */
-    suspend fun initialize() {
+    private suspend fun initialize() {
         scope.launch {
             startHealthMonitoring()
             startResourceMonitoring()
             startBottleneckDetection()
+            isMonitoring = true
+            loggingProvider.get().logInfo(
+                "DiagnosticsManager initialized successfully",
+                mapOf(
+                    "monitoringInterval" to MONITORING_INTERVAL_MS,
+                    "healthRetention" to HEALTH_HISTORY_RETENTION_HOURS,
+                    "bottleneckWindow" to BOTTLENECK_DETECTION_WINDOW_MINUTES
+                )
+            )
         }
     }
 
@@ -85,6 +113,38 @@ class DiagnosticsManager @Inject constructor(
         isMonitoring = false
         monitoringJob?.cancel()
         scope.cancel()
+        loggingProvider.get().logInfo("DiagnosticsManager shutdown completed", emptyMap())
+    }
+
+    // =============================================================================
+    // DiagnosticsProvider Implementation
+    // =============================================================================
+
+    override suspend fun getHealthMetric(name: String): Long {
+        return healthMetrics[name]?.get() ?: 0L
+    }
+
+    override suspend fun getPerformanceMetric(name: String): Long {
+        return performanceMetrics[name]?.get() ?: 0L
+    }
+
+    override suspend fun getCurrentReport(): DiagnosticReport {
+        val healthScore = getSystemHealthScore()
+        val bottlenecks = detectPerformanceBottlenecks()
+        val resource = resourceUsage.value
+        val trends = resourceTrends.takeLast(50)
+        return DiagnosticReport(
+            timestamp = System.currentTimeMillis(),
+            systemHealth = healthScore,
+            bottlenecks = bottlenecks,
+            resourceUsage = resource,
+            resourceTrends = trends,
+            recommendations = generateRecommendations(healthScore, bottlenecks, resource),
+            monitoringDuration = System.currentTimeMillis() - monitoringStartTime,
+            diagnosticsOverhead = calculateDiagnosticsOverhead(),
+            performanceMetrics = performanceMetrics.mapValues { it.value.get() },
+            healthMetrics = healthMetrics.mapValues { it.value.get() }
+        )
     }
 
     // =============================================================================
@@ -164,16 +224,15 @@ class DiagnosticsManager @Inject constructor(
     suspend fun generateDiagnosticReport(): DiagnosticReport {
         val healthScore = getSystemHealthScore()
         val bottlenecks = detectPerformanceBottlenecks()
-        val resourceUsage = getResourceUsage()
-        val trends = getResourceTrends()
-        
+        val resource = resourceUsage.value
+        val trends = resourceTrends.takeLast(50)
         return DiagnosticReport(
             timestamp = System.currentTimeMillis(),
             systemHealth = healthScore,
             bottlenecks = bottlenecks,
-            resourceUsage = resourceUsage,
+            resourceUsage = resource,
             resourceTrends = trends,
-            recommendations = generateRecommendations(healthScore, bottlenecks, resourceUsage),
+            recommendations = generateRecommendations(healthScore, bottlenecks, resource),
             monitoringDuration = System.currentTimeMillis() - monitoringStartTime,
             diagnosticsOverhead = calculateDiagnosticsOverhead()
         )
@@ -218,39 +277,6 @@ class DiagnosticsManager @Inject constructor(
     // =============================================================================
     // RESOURCE MONITORING
     // =============================================================================
-
-    /**
-     * Get current resource usage snapshot
-     */
-    suspend fun getResourceUsage(): ResourceUsageSnapshot {
-        val runtime = Runtime.getRuntime()
-        val memoryInfo = android.app.ActivityManager.MemoryInfo()
-        
-        try {
-            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-            activityManager.getMemoryInfo(memoryInfo)
-        } catch (e: Exception) {
-            // Fallback to basic memory info
-        }
-        
-        val resourceUsage = ResourceUsageSnapshot(
-            timestamp = System.currentTimeMillis(),
-            memoryUsed = (runtime.totalMemory() - runtime.freeMemory()).toDouble() / 1024 / 1024, // MB
-            memoryTotal = runtime.totalMemory().toDouble() / 1024 / 1024, // MB
-            memoryAvailable = memoryInfo.availMem.toDouble() / 1024 / 1024, // MB
-            cpuUsage = estimateCpuUsage(),
-            networkLatency = estimateNetworkLatency(),
-            batteryLevel = getBatteryLevel(),
-            diskUsage = estimateDiskUsage(),
-            threadCount = Thread.activeCount(),
-            gcPressure = estimateGcPressure()
-        )
-        
-        _resourceUsage.value = resourceUsage
-        addToResourceTrends(resourceUsage)
-        
-        return resourceUsage
-    }
 
     /**
      * Track resource usage trends
@@ -345,7 +371,7 @@ class DiagnosticsManager @Inject constructor(
         scope.launch {
             while (isMonitoring) {
                 try {
-                    getResourceUsage()
+                    updateResourceUsage()
                     delay(MONITORING_INTERVAL_MS)
                 } catch (e: Exception) {
                     delay(MONITORING_INTERVAL_MS)
@@ -382,7 +408,7 @@ class DiagnosticsManager @Inject constructor(
     }
 
     private fun calculateResourceHealth(): Double {
-        val currentUsage = _resourceUsage.value
+        val currentUsage = resourceUsage.value
         
         val memoryHealth = 1.0 - (currentUsage.memoryUsed / currentUsage.memoryTotal.coerceAtLeast(1.0))
         val cpuHealth = 1.0 - (currentUsage.cpuUsage / 100.0)
@@ -425,41 +451,44 @@ class DiagnosticsManager @Inject constructor(
         componentHealth: Map<ComponentType, ComponentHealth>,
         resourceHealth: Double,
         performanceHealth: Double
-    ): List<HealthFactor> {
-        val factors = mutableListOf<HealthFactor>()
+    ): List<String> {
+        val factors = mutableListOf<String>()
         
         // Check component health factors
         componentHealth.forEach { (component, health) ->
             when {
-                health.score < CRITICAL_HEALTH_THRESHOLD -> {
-                    factors.add(HealthFactor.CRITICAL_COMPONENT_HEALTH(component))
+                health.score < 0.3 -> {
+                    factors.add("Critical: $component")
                 }
-                health.score < WARNING_HEALTH_THRESHOLD -> {
-                    factors.add(HealthFactor.WARNING_COMPONENT_HEALTH(component))
+                health.score < 0.7 -> {
+                    factors.add("High: $component")
+                }
+                health.score < 0.9 -> {
+                    factors.add("Medium: $component")
                 }
             }
         }
         
         // Check resource health factors
-        if (resourceHealth < CRITICAL_HEALTH_THRESHOLD) {
-            factors.add(HealthFactor.CRITICAL_RESOURCE_USAGE)
-        } else if (resourceHealth < WARNING_HEALTH_THRESHOLD) {
-            factors.add(HealthFactor.HIGH_RESOURCE_USAGE)
+        if (resourceHealth < 0.3) {
+            factors.add("Critical: Resource usage")
+        } else if (resourceHealth < 0.7) {
+            factors.add("High: Resource usage")
         }
         
         // Check performance health factors
-        if (performanceHealth < CRITICAL_HEALTH_THRESHOLD) {
-            factors.add(HealthFactor.CRITICAL_PERFORMANCE)
-        } else if (performanceHealth < WARNING_HEALTH_THRESHOLD) {
-            factors.add(HealthFactor.DEGRADED_PERFORMANCE)
+        if (performanceHealth < 0.3) {
+            factors.add("Critical: Performance")
+        } else if (performanceHealth < 0.7) {
+            factors.add("High: Performance")
         }
         
         return factors
     }
 
-    private fun calculateHealthTrend(): HealthTrend {
+    private fun calculateHealthTrend(): TrendDirection {
         // Analyze recent health scores to determine trend
-        return HealthTrend.STABLE // Placeholder
+        return TrendDirection.STABLE // Placeholder
     }
 
     private fun calculateConfidenceLevel(componentCount: Int): Double {
@@ -474,75 +503,70 @@ class DiagnosticsManager @Inject constructor(
     private suspend fun monitorConnectionPoolHealth(): ComponentHealth {
         // Will integrate with Phase 4.2 ConnectionPoolManager
         return ComponentHealth(
+            component = ComponentType.CONNECTION_POOL,
             score = 0.9,
-            status = ComponentStatus.HEALTHY,
-            lastUpdated = System.currentTimeMillis(),
             metrics = mapOf(
-                "activeConnections" to 5,
+                "activeConnections" to 5.0,
                 "successRate" to 0.98,
                 "avgLatency" to 45.0
             ),
-            issues = emptyList()
+            timestamp = System.currentTimeMillis()
         )
     }
 
     private suspend fun monitorCacheHealth(): ComponentHealth {
         // Will integrate with Phase 4.2 CacheManager
         return ComponentHealth(
+            component = ComponentType.CACHE,
             score = 0.85,
-            status = ComponentStatus.HEALTHY,
-            lastUpdated = System.currentTimeMillis(),
             metrics = mapOf(
                 "hitRate" to 0.82,
                 "memoryUsage" to 65.0,
                 "evictionRate" to 0.05
             ),
-            issues = emptyList()
+            timestamp = System.currentTimeMillis()
         )
     }
 
     private suspend fun monitorCompressionHealth(): ComponentHealth {
         // Will integrate with Phase 4.2 CompressionManager
         return ComponentHealth(
+            component = ComponentType.COMPRESSION,
             score = 0.92,
-            status = ComponentStatus.HEALTHY,
-            lastUpdated = System.currentTimeMillis(),
             metrics = mapOf(
                 "compressionRatio" to 0.7,
                 "processingTime" to 12.0,
                 "bandwidthSavings" to 0.3
             ),
-            issues = emptyList()
+            timestamp = System.currentTimeMillis()
         )
     }
 
     private suspend fun monitorPipelineHealth(): ComponentHealth {
         // Will integrate with Phase 4.2 RequestPipelineManager
         return ComponentHealth(
+            component = ComponentType.PIPELINE,
             score = 0.88,
-            status = ComponentStatus.HEALTHY,
-            lastUpdated = System.currentTimeMillis(),
             metrics = mapOf(
                 "throughput" to 150.0,
-                "queueSize" to 3,
+                "queueSize" to 3.0,
                 "errorRate" to 0.02
             ),
-            issues = emptyList()
+            timestamp = System.currentTimeMillis()
         )
     }
 
     private suspend fun monitorMetricsHealth(): ComponentHealth {
         // Monitor the PerformanceMetrics component itself
         return ComponentHealth(
+            component = ComponentType.METRICS,
             score = 0.95,
-            status = ComponentStatus.HEALTHY,
-            lastUpdated = System.currentTimeMillis(),
             metrics = mapOf(
                 "dataAccuracy" to 0.99,
                 "processingLatency" to 8.0,
                 "storageUsage" to 12.0
             ),
-            issues = emptyList()
+            timestamp = System.currentTimeMillis()
         )
     }
 
@@ -557,38 +581,32 @@ class DiagnosticsManager @Inject constructor(
         }
         
         return ComponentHealth(
+            component = ComponentType.NETWORK,
             score = score,
-            status = if (score > 0.7) ComponentStatus.HEALTHY else ComponentStatus.DEGRADED,
-            lastUpdated = System.currentTimeMillis(),
             metrics = mapOf(
                 "latency" to latency,
                 "availability" to 0.99,
                 "bandwidth" to 25.0
             ),
-            issues = if (score < 0.7) listOf("High network latency detected") else emptyList()
+            timestamp = System.currentTimeMillis()
         )
     }
 
     private suspend fun monitorSystemHealth(): ComponentHealth {
-        val resourceUsage = getResourceUsage()
+        val resourceUsage = resourceUsage.value
         val memoryHealth = 1.0 - (resourceUsage.memoryUsed / resourceUsage.memoryTotal)
         val cpuHealth = 1.0 - (resourceUsage.cpuUsage / 100.0)
         val overallHealth = (memoryHealth + cpuHealth) / 2.0
         
         return ComponentHealth(
+            component = ComponentType.SYSTEM,
             score = overallHealth,
-            status = when {
-                overallHealth > 0.8 -> ComponentStatus.HEALTHY
-                overallHealth > 0.6 -> ComponentStatus.DEGRADED
-                else -> ComponentStatus.CRITICAL
-            },
-            lastUpdated = System.currentTimeMillis(),
             metrics = mapOf(
                 "memoryUsage" to resourceUsage.memoryUsed,
                 "cpuUsage" to resourceUsage.cpuUsage,
-                "threadCount" to resourceUsage.threadCount
+                "threadCount" to resourceUsage.threadCount.toDouble()
             ),
-            issues = if (overallHealth < 0.6) listOf("High system resource usage") else emptyList()
+            timestamp = System.currentTimeMillis()
         )
     }
 
@@ -600,7 +618,7 @@ class DiagnosticsManager @Inject constructor(
         val health = monitorComponent(component)
         val bottlenecks = mutableListOf<Bottleneck>()
         
-        if (health.score < CRITICAL_HEALTH_THRESHOLD) {
+        if (health.score < 0.3) {
             bottlenecks.add(
                 Bottleneck(
                     type = BottleneckType.COMPONENT_DEGRADATION,
@@ -621,43 +639,70 @@ class DiagnosticsManager @Inject constructor(
     }
 
     private suspend fun analyzeResourceBottlenecks(): List<Bottleneck> {
-        val usage = getResourceUsage()
         val bottlenecks = mutableListOf<Bottleneck>()
+        val resourceUsage = resourceUsage.value
         
-        // Memory bottleneck
-        if (usage.memoryUsed / usage.memoryTotal > 0.9) {
+        // Check memory bottlenecks
+        if (resourceUsage.memoryUsed / resourceUsage.memoryTotal > 0.8) {
             bottlenecks.add(
                 Bottleneck(
                     type = BottleneckType.MEMORY_PRESSURE,
-                    severity = Severity.CRITICAL,
+                    severity = if (resourceUsage.memoryUsed / resourceUsage.memoryTotal > 0.9) 
+                        Severity.CRITICAL else Severity.HIGH,
                     component = ComponentType.SYSTEM,
                     impact = ImpactAssessment(
-                        magnitude = usage.memoryUsed / usage.memoryTotal,
-                        affectedComponents = ComponentType.values().toList(),
+                        magnitude = resourceUsage.memoryUsed / resourceUsage.memoryTotal,
+                        affectedComponents = listOf(ComponentType.SYSTEM),
                         userImpact = UserImpact.HIGH
                     ),
                     recommendations = listOf(
-                        "Clear cache", "Reduce memory usage", "Enable compression"
+                        "Clear memory caches",
+                        "Review memory allocation patterns",
+                        "Consider increasing memory limits"
                     ),
                     timestamp = System.currentTimeMillis()
                 )
             )
         }
         
-        // CPU bottleneck
-        if (usage.cpuUsage > 80) {
+        // Check CPU bottlenecks
+        if (resourceUsage.cpuUsage > 75) {
             bottlenecks.add(
                 Bottleneck(
                     type = BottleneckType.CPU_SATURATION,
-                    severity = Severity.HIGH,
+                    severity = if (resourceUsage.cpuUsage > 90) Severity.CRITICAL else Severity.HIGH,
                     component = ComponentType.SYSTEM,
                     impact = ImpactAssessment(
-                        magnitude = usage.cpuUsage / 100.0,
-                        affectedComponents = listOf(ComponentType.PIPELINE, ComponentType.COMPRESSION),
-                        userImpact = UserImpact.MEDIUM
+                        magnitude = resourceUsage.cpuUsage / 100.0,
+                        affectedComponents = listOf(ComponentType.SYSTEM),
+                        userImpact = UserImpact.HIGH
                     ),
                     recommendations = listOf(
-                        "Reduce processing intensity", "Optimize algorithms", "Use background threads"
+                        "Optimize CPU-intensive operations",
+                        "Review thread pool configuration",
+                        "Consider scaling resources"
+                    ),
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+        
+        // Check network bottlenecks
+        if (resourceUsage.networkLatency > 100) {
+            bottlenecks.add(
+                Bottleneck(
+                    type = BottleneckType.NETWORK_LATENCY,
+                    severity = if (resourceUsage.networkLatency > 200) Severity.CRITICAL else Severity.HIGH,
+                    component = ComponentType.NETWORK,
+                    impact = ImpactAssessment(
+                        magnitude = resourceUsage.networkLatency / 1000.0,
+                        affectedComponents = listOf(ComponentType.NETWORK),
+                        userImpact = UserImpact.HIGH
+                    ),
+                    recommendations = listOf(
+                        "Check network connectivity",
+                        "Review network configuration",
+                        "Consider connection pooling"
                     ),
                     timestamp = System.currentTimeMillis()
                 )
@@ -668,22 +713,69 @@ class DiagnosticsManager @Inject constructor(
     }
 
     private suspend fun analyzeTrendBottlenecks(): List<Bottleneck> {
-        val trends = getResourceTrends()
         val bottlenecks = mutableListOf<Bottleneck>()
+        val trends = getResourceTrends()
         
-        if (trends.memoryTrend == TrendDirection.INCREASING) {
+        // Check memory trend
+        if (trends.memoryTrend == TrendDirection.IMPROVING) {
             bottlenecks.add(
                 Bottleneck(
                     type = BottleneckType.MEMORY_LEAK,
-                    severity = Severity.MEDIUM,
+                    severity = Severity.HIGH,
                     component = ComponentType.SYSTEM,
                     impact = ImpactAssessment(
                         magnitude = 0.5,
-                        affectedComponents = ComponentType.values().toList(),
+                        affectedComponents = listOf(ComponentType.SYSTEM),
                         userImpact = UserImpact.MEDIUM
                     ),
                     recommendations = listOf(
-                        "Monitor for memory leaks", "Implement memory cleanup", "Profile memory usage"
+                        "Investigate potential memory leaks",
+                        "Monitor object lifecycles",
+                        "Review memory allocation patterns"
+                    ),
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+        
+        // Check thread contention trend
+        if (trends.cpuTrend == TrendDirection.IMPROVING) {
+            bottlenecks.add(
+                Bottleneck(
+                    type = BottleneckType.THREAD_CONTENTION,
+                    severity = Severity.MEDIUM,
+                    component = ComponentType.SYSTEM,
+                    impact = ImpactAssessment(
+                        magnitude = 0.3,
+                        affectedComponents = listOf(ComponentType.SYSTEM),
+                        userImpact = UserImpact.MEDIUM
+                    ),
+                    recommendations = listOf(
+                        "Review thread synchronization",
+                        "Optimize lock contention",
+                        "Consider thread pool tuning"
+                    ),
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        }
+        
+        // Check resource exhaustion trend
+        if (trends.overallTrend == TrendDirection.IMPROVING) {
+            bottlenecks.add(
+                Bottleneck(
+                    type = BottleneckType.RESOURCE_EXHAUSTION,
+                    severity = Severity.HIGH,
+                    component = ComponentType.SYSTEM,
+                    impact = ImpactAssessment(
+                        magnitude = 0.4,
+                        affectedComponents = listOf(ComponentType.SYSTEM),
+                        userImpact = UserImpact.HIGH
+                    ),
+                    recommendations = listOf(
+                        "Review resource allocation",
+                        "Implement resource pooling",
+                        "Consider scaling resources"
                     ),
                     timestamp = System.currentTimeMillis()
                 )
@@ -725,7 +817,7 @@ class DiagnosticsManager @Inject constructor(
         val olderAvg = older.average()
         
         return when {
-            recentAvg > olderAvg * 1.1 -> TrendDirection.INCREASING
+            recentAvg > olderAvg * 1.1 -> TrendDirection.IMPROVING
             recentAvg < olderAvg * 0.9 -> TrendDirection.DECREASING
             else -> TrendDirection.STABLE
         }
@@ -738,11 +830,11 @@ class DiagnosticsManager @Inject constructor(
         val cpuTrend = calculateTrend(trends.map { it.cpuUsage })
         val networkTrend = calculateTrend(trends.map { it.networkLatency })
         
-        val increasingCount = listOf(memoryTrend, cpuTrend, networkTrend).count { it == TrendDirection.INCREASING }
+        val improvingCount = listOf(memoryTrend, cpuTrend, networkTrend).count { it == TrendDirection.IMPROVING }
         val decreasingCount = listOf(memoryTrend, cpuTrend, networkTrend).count { it == TrendDirection.DECREASING }
         
         return when {
-            increasingCount >= 2 -> TrendDirection.INCREASING
+            improvingCount >= 2 -> TrendDirection.IMPROVING
             decreasingCount >= 2 -> TrendDirection.DECREASING
             else -> TrendDirection.STABLE
         }
@@ -795,7 +887,7 @@ class DiagnosticsManager @Inject constructor(
     ): List<String> {
         val recommendations = mutableListOf<String>()
         
-        if (healthScore.overall < CRITICAL_HEALTH_THRESHOLD) {
+        if (healthScore.overall < 0.3) {
             recommendations.add("System health is critical - immediate attention required")
         }
         
@@ -825,11 +917,52 @@ class DiagnosticsManager @Inject constructor(
     }
 
     // Placeholder implementations for resource monitoring
-    private fun estimateCpuUsage(): Double = 25.0
-    private fun estimateNetworkLatency(): Double = 45.0
-    private fun getBatteryLevel(): Double = 75.0
-    private fun estimateDiskUsage(): Double = 60.0
-    private fun estimateGcPressure(): Double = 15.0
+    private suspend fun estimateCpuUsage(): Double = withContext(Dispatchers.IO) {
+        // Implementation for CPU usage estimation
+        0.0 // Placeholder
+    }
+
+    private suspend fun estimateNetworkLatency(): Double = withContext(Dispatchers.IO) {
+        // Implementation for network latency estimation
+        0.0 // Placeholder
+    }
+
+    private suspend fun estimateDiskUsage(): Double = withContext(Dispatchers.IO) {
+        // Implementation for disk usage estimation
+        0.0 // Placeholder
+    }
+
+    private suspend fun getBatteryLevel(): Double = withContext(Dispatchers.IO) {
+        // Implementation for battery level estimation
+        100.0 // Placeholder
+    }
+
+    private suspend fun estimateGcPressure(): Double = withContext(Dispatchers.IO) {
+        // Implementation for GC pressure estimation
+        0.0 // Placeholder
+    }
+
+    private suspend fun getMemoryInfo(): MemoryInfo = withContext(Dispatchers.IO) {
+        val runtime = Runtime.getRuntime()
+        val usedMemory = (runtime.totalMemory() - runtime.freeMemory()) / (1024.0 * 1024.0) // Convert to MB
+        val totalMemory = runtime.maxMemory() / (1024.0 * 1024.0) // Convert to MB
+        val availableMemory = totalMemory - usedMemory
+        MemoryInfo(used = usedMemory, total = totalMemory, available = availableMemory)
+    }
+
+    private suspend fun getCpuInfo(): CpuInfo = withContext(Dispatchers.IO) {
+        val cpuUsage = estimateCpuUsage()
+        CpuInfo(usage = cpuUsage)
+    }
+
+    private suspend fun getDiskInfo(): DiskInfo = withContext(Dispatchers.IO) {
+        val diskUsage = estimateDiskUsage()
+        DiskInfo(usage = diskUsage)
+    }
+
+    private suspend fun getNetworkLatency(): Double = withContext(Dispatchers.IO) {
+        estimateNetworkLatency()
+    }
 
     // Placeholder implementations for Phase 4.2 integration
     private fun analyzeConnectionPoolMetrics(): String = "Connection pool healthy"
@@ -851,36 +984,40 @@ class DiagnosticsManager @Inject constructor(
     /**
      * Get current health score as Flow for reactive monitoring
      */
-    fun getCurrentHealthScore(): Flow<HealthScore> = healthScore.asStateFlow()
+    fun getCurrentHealthScore(): StateFlow<HealthScore> = systemHealthScore
 
     /**
      * Get component health status as Flow for reactive monitoring
      */
-    fun getComponentHealth(): Flow<Map<ComponentType, ComponentHealth>> = flow {
-        val health = _currentHealth.value
-        emit(health.components)
-    }
+    fun getComponentHealthFlow(): StateFlow<Map<ComponentType, ComponentHealth>> = componentHealth
 
     /**
      * Get active bottlenecks as Flow for reactive monitoring
      */
-    fun getActiveBottlenecks(): Flow<List<Bottleneck>> = flow {
-        emit(analyzeBottlenecks())
-    }
+    fun getActiveBottlenecks(): StateFlow<List<Bottleneck>> = detectedBottlenecks
+
+    /**
+     * Get resource usage as Flow for reactive monitoring
+     */
+    fun getResourceUsageFlow(): StateFlow<ResourceUsageSnapshot> = resourceUsage
 
     /**
      * Perform comprehensive health check and return detailed results
      */
     suspend fun performHealthCheck(): DiagnosticReport {
-        val health = performComprehensiveHealthCheck()
+        val health = getSystemHealthScore()
+        val bottlenecks = analyzeBottlenecks()
+        val resource = resourceUsage.value
+        val trends = resourceTrends.takeLast(50)
         return DiagnosticReport(
             timestamp = System.currentTimeMillis(),
-            healthScore = health.overallScore,
-            componentHealth = health.components,
-            bottlenecks = analyzeBottlenecks(),
-            resourceUsage = getCurrentResourceUsage(),
-            recommendations = generateRecommendations(health.overallScore, analyzeBottlenecks(), getCurrentResourceUsage()),
-            systemInfo = getSystemInfo()
+            systemHealth = health,
+            bottlenecks = bottlenecks,
+            resourceUsage = resource,
+            resourceTrends = trends,
+            recommendations = generateRecommendations(health, bottlenecks, resource),
+            monitoringDuration = System.currentTimeMillis() - monitoringStartTime,
+            diagnosticsOverhead = calculateDiagnosticsOverhead()
         )
     }
 
@@ -895,14 +1032,7 @@ class DiagnosticsManager @Inject constructor(
      * Get component details for specific component
      */
     suspend fun getComponentDetails(component: ComponentType): ComponentHealth? {
-        return _currentHealth.value.components[component]
-    }
-
-    /**
-     * Generate comprehensive diagnostic report
-     */
-    suspend fun generateReport(): DiagnosticReport {
-        return performHealthCheck()
+        return componentHealth.value[component]
     }
 
     private fun getSystemInfo(): Map<String, String> {
@@ -913,4 +1043,132 @@ class DiagnosticsManager @Inject constructor(
             "manufacturer" to android.os.Build.MANUFACTURER
         )
     }
+
+    // =============================================================================
+    // RESOURCE MONITORING IMPLEMENTATION
+    // =============================================================================
+
+    /**
+     * Update resource usage metrics
+     */
+    private suspend fun updateResourceUsage() {
+        val memoryInfo = getMemoryInfo()
+        val cpuInfo = getCpuInfo()
+        val diskInfo = getDiskInfo()
+        
+        _resourceUsage.value = ResourceUsageSnapshot(
+            timestamp = System.currentTimeMillis(),
+            memoryUsed = memoryInfo.used,
+            memoryTotal = memoryInfo.total,
+            memoryAvailable = memoryInfo.available,
+            cpuUsage = cpuInfo.usage,
+            diskUsage = diskInfo.usage,
+            networkLatency = getNetworkLatency(),
+            batteryLevel = getBatteryLevel(),
+            threadCount = Thread.activeCount(),
+            gcPressure = estimateGcPressure()
+        )
+        
+        // Update resource trends
+        resourceTrends.add(_resourceUsage.value)
+        if (resourceTrends.size > 100) {
+            resourceTrends.removeAt(0)
+        }
+    }
+
+    private data class MemoryInfo(
+        val used: Double,
+        val total: Double,
+        val available: Double
+    )
+
+    private data class CpuInfo(
+        val usage: Double
+    )
+
+    private data class DiskInfo(
+        val usage: Double
+    )
+
+    private fun startPerformanceMonitoring() {
+        scope.launch {
+            while (isMonitoring) {
+                try {
+                    checkPerformanceMetrics()
+                    delay(performanceCheckInterval)
+                        } catch (e: Exception) {
+            scope.launch {
+                loggingProvider.get().logError("Performance monitoring error", e)
+            }
+                }
+            }
+        }
+    }
+
+    private suspend fun checkPerformanceMetrics() {
+        withContext(Dispatchers.Default) {
+            // Frame rate analysis
+            val frameRate = getFrameRate()
+            
+            // Network latency check
+            val networkLatency = getNetworkLatency()
+            
+            // Audio buffer analysis
+            val audioBufferHealth = getAudioBufferHealth()
+            
+            // Update performance metrics
+            performanceMetrics["frame_rate"] = AtomicLong(frameRate)
+            performanceMetrics["network_latency"] = AtomicLong(networkLatency.toLong())
+            performanceMetrics["audio_buffer_health"] = AtomicLong(audioBufferHealth)
+            
+            // Log performance check
+            loggingProvider.get().logInfo("Performance check completed", mapOf(
+                "frame_rate" to frameRate.toDouble(),
+                "network_latency" to networkLatency,
+                "audio_buffer_health" to audioBufferHealth.toDouble()
+            ))
+        }
+    }
+
+    private fun getFrameRate(): Long {
+        // Simplified frame rate calculation
+        return try {
+            val choreographer = android.view.Choreographer.getInstance()
+            val frameRate = 60L // Default frame rate
+            frameRate
+        } catch (e: Exception) {
+            scope.launch {
+                loggingProvider.get().logError("Frame rate calculation error", e)
+            }
+            0L
+        }
+    }
+
+    private fun getAudioBufferHealth(): Long {
+        // Simplified audio buffer health check
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            val bufferSize = android.media.AudioTrack.getMinBufferSize(
+                44100,
+                android.media.AudioFormat.CHANNEL_OUT_STEREO,
+                android.media.AudioFormat.ENCODING_PCM_16BIT
+            )
+            bufferSize.toLong()
+        } catch (e: Exception) {
+            scope.launch {
+                loggingProvider.get().logError("Audio buffer health check error", e)
+            }
+            0L
+        }
+    }
+
+    fun observeDiagnosticEvents(): Flow<DiagnosticEvent> = diagnosticEvents.asSharedFlow()
 }
+
+sealed class DiagnosticEvent {
+    data class ReportGenerated(val report: DiagnosticReport) : DiagnosticEvent()
+    data class HealthAlert(val metric: String, val value: Long, val threshold: Long) : DiagnosticEvent()
+    data class PerformanceAlert(val metric: String, val value: Long, val threshold: Long) : DiagnosticEvent()
+}
+
+

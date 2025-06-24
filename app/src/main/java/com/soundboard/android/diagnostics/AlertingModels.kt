@@ -1,5 +1,6 @@
 package com.soundboard.android.diagnostics
 
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
 /**
@@ -87,7 +88,7 @@ data class Alert(
     val type: AlertType,
     val severity: AlertSeverity,
     val message: String,
-    val context: Map<String, @Serializable(with = kotlinx.serialization.json.JsonElementSerializer::class) kotlinx.serialization.json.JsonElement>,
+    val context: Map<String, String>,
     val timestamp: Long,
     val status: AlertStatus,
     val acknowledgedBy: String? = null,
@@ -160,7 +161,7 @@ enum class NotificationChannel {
 data class NotificationConfig(
     val enabled: Boolean,
     val severityFilter: Set<AlertSeverity>,
-    val quietHours: TimeRange? = null,
+    val quietHours: @Contextual TimeRange? = null,
     val rateLimitPerHour: Int = 10,
     val template: String? = null
 )

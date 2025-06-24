@@ -352,10 +352,6 @@ fun SoundboardScreen(
     if (showLayoutManagerScreen) {
         LayoutManagerScreen(
             onNavigateBack = { showLayoutManagerScreen = false },
-            onLayoutSelected = { layout ->
-                viewModel.switchToLayout(layout)
-                showLayoutManagerScreen = false
-            },
             viewModel = viewModel
         )
     }

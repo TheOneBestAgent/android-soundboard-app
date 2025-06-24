@@ -1,6 +1,7 @@
 package com.soundboard.android.diagnostics
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Contextual
 
 /**
  * Data models for the PerformanceTuner system
@@ -64,14 +65,16 @@ enum class OptimizationStatus {
 @Serializable
 data class PerformanceSnapshot(
     val timestamp: Long,
-    val resourceUsage: ResourceUsageSnapshot,
+    val metrics: Map<String, Double>,
+    @Contextual val resourceUsage: ResourceUsageSnapshot,
     val healthScore: Double,
     val componentScores: Map<String, Double>,
     val bottleneckCount: Int,
     val criticalBottlenecks: Int,
     val responseTime: Double,
     val throughput: Double,
-    val errorRate: Double
+    val errorRate: Double,
+    val bottlenecks: List<String> = emptyList()
 )
 
 /**

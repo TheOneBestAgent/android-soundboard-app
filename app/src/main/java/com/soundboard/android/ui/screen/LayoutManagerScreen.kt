@@ -1,6 +1,7 @@
 package com.soundboard.android.ui.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,23 +16,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.soundboard.android.data.model.*
+import com.soundboard.android.ui.component.*
 import com.soundboard.android.ui.theme.*
 import com.soundboard.android.ui.viewmodel.SoundboardViewModel
-import com.soundboard.android.ui.component.CreateLayoutDialog
-import com.soundboard.android.ui.component.TemplateDialog
-import com.soundboard.android.ui.component.EditLayoutDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LayoutManagerScreen(
     onNavigateBack: () -> Unit,
-    onLayoutSelected: (SoundboardLayout) -> Unit,
     viewModel: SoundboardViewModel = hiltViewModel()
 ) {
     val layouts by viewModel.layouts.collectAsState()
@@ -49,183 +48,150 @@ fun LayoutManagerScreen(
             .background(DarkBlueBackground)
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(16.dp)
     ) {
-        // Header with icon-inspired styling
+        // Header with icon-inspired styling - Fixed
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 24.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(ButtonSurface)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = NeonPink
-                )
-            }
-            
-            Text(
-                "Layout Manager",
-                style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold
-            )
-            
-            Row {
-                // Template button
                 IconButton(
-                    onClick = { showTemplateDialog = true },
+                    onClick = onNavigateBack,
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(CoralAccent.copy(alpha = 0.2f))
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(ButtonSurface)
                 ) {
                     Icon(
-                        Icons.Default.Apps,
-                        contentDescription = "Templates",
-                        tint = CoralAccent
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = TextPrimary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 
-                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "Layout Manager",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Create and manage your soundboard layouts",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+            
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(
+                    onClick = { showTemplateDialog = true },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(NeonPink.copy(alpha = 0.2f))
+                ) {
+                    Icon(
+                        Icons.Default.Category,
+                        contentDescription = "Templates",
+                        tint = NeonPink,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
                 
-                // Create new layout button
                 IconButton(
                     onClick = { showCreateDialog = true },
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(NeonPink.copy(alpha = 0.2f))
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                 ) {
                     Icon(
                         Icons.Default.Add,
                         contentDescription = "Create Layout",
-                        tint = NeonPink
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
         }
         
-        // Current Layout Card
-        currentLayout?.let { layout ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .shadow(8.dp, RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(
-                    containerColor = DarkBlueSurface
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Current Layout",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = NeonPinkLight,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        
-                        Surface(
-                            color = NeonPink.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                "ACTIVE",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = NeonPink,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    Text(
-                        layout.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Text(
-                        "${layout.gridColumns}×${layout.gridRows} grid • ${layout.maxButtons} buttons",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary
-                    )
-                    
-                    layout.description?.let { desc ->
-                        Text(
-                            desc,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-            }
-        }
-        
-        // Layout Categories
-        LazyRow(
-            modifier = Modifier.padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(LayoutCategory.values()) { category ->
-                CategoryChip(
-                    category = category,
-                    isSelected = category == selectedCategory,
-                    onClick = { selectedCategory = category }
-                )
-            }
-        }
-        
-        // Layouts List
+        // Scrollable content area
         LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp)
         ) {
-            val filteredLayouts = layouts.filter { layout ->
-                when (selectedCategory) {
-                    LayoutCategory.CUSTOM -> !layout.isTemplate
-                    else -> layout.templateCategory == selectedCategory.name.lowercase() || 
-                            (!layout.isTemplate && selectedCategory == LayoutCategory.GENERAL)
+            // Current Layout Info
+            item {
+                currentLayout?.let { layout ->
+                    CurrentLayoutCard(
+                        layout = layout,
+                        onEditLayout = {
+                            selectedLayoutForEdit = layout
+                            showEditDialog = true
+                        }
+                    )
                 }
             }
             
-            items(filteredLayouts) { layout ->
-                LayoutCard(
-                    layout = layout,
-                    isActive = layout.id == currentLayout?.id,
-                    onSelect = { onLayoutSelected(layout) },
-                    onEdit = { 
-                        selectedLayoutForEdit = layout
-                        showEditDialog = true 
-                    },
-                    onDelete = { viewModel.deleteLayout(layout) },
-                    onDuplicate = { viewModel.duplicateLayout(layout) }
+            // Category Filter
+            item {
+                Text(
+                    text = "Browse Layouts",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
                 )
+                
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(LayoutCategory.values()) { category ->
+                        CategoryChip(
+                            category = category,
+                            isSelected = category == selectedCategory,
+                            onClick = { selectedCategory = category }
+                        )
+                    }
+                }
             }
             
-            if (filteredLayouts.isEmpty()) {
+            // Layouts Grid
+            val filteredLayouts = layouts.filter { layout ->
+                selectedCategory == LayoutCategory.GENERAL || layout.templateCategory == selectedCategory.name.lowercase()
+            }
+            
+            if (filteredLayouts.isNotEmpty()) {
+                items(filteredLayouts) { layout ->
+                    LayoutCard(
+                        layout = layout,
+                        isActive = layout.id == currentLayout?.id,
+                        onSelectLayout = { /* TODO: viewModel.setCurrentLayout(layout) */ },
+                        onEditLayout = {
+                            selectedLayoutForEdit = layout
+                            showEditDialog = true
+                        },
+                        onDeleteLayout = { viewModel.deleteLayout(layout) }
+                    )
+                }
+            } else {
                 item {
-                    EmptyStateCard(
+                    EmptyLayoutsCard(
                         category = selectedCategory,
                         onCreateLayout = { showCreateDialog = true },
                         onBrowseTemplates = { showTemplateDialog = true }
@@ -235,7 +201,7 @@ fun LayoutManagerScreen(
         }
     }
     
-    // Create Layout Dialog
+    // Dialogs
     if (showCreateDialog) {
         CreateLayoutDialog(
             onDismiss = { showCreateDialog = false },
@@ -246,22 +212,20 @@ fun LayoutManagerScreen(
         )
     }
     
-    // Template Dialog
     if (showTemplateDialog) {
         TemplateDialog(
             onDismiss = { showTemplateDialog = false },
             onSelectTemplate = { template ->
-                viewModel.createFromTemplate(template)
+                /* TODO: viewModel.createLayoutFromTemplate(template) */
                 showTemplateDialog = false
             }
         )
     }
     
-    // Edit Layout Dialog
     if (showEditDialog && selectedLayoutForEdit != null) {
         EditLayoutDialog(
             layout = selectedLayoutForEdit!!,
-            onDismiss = { 
+            onDismiss = {
                 showEditDialog = false
                 selectedLayoutForEdit = null
             },
@@ -305,15 +269,14 @@ fun CategoryChip(
 fun LayoutCard(
     layout: SoundboardLayout,
     isActive: Boolean,
-    onSelect: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onDuplicate: () -> Unit
+    onSelectLayout: () -> Unit,
+    onEditLayout: () -> Unit,
+    onDeleteLayout: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onSelect() }
+            .clickable { onSelectLayout() }
             .shadow(
                 elevation = if (isActive) 12.dp else 4.dp,
                 shape = RoundedCornerShape(16.dp)
@@ -364,7 +327,7 @@ fun LayoutCard(
                     }
                     
                     IconButton(
-                        onClick = onEdit,
+                        onClick = onEditLayout,
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
@@ -375,21 +338,9 @@ fun LayoutCard(
                         )
                     }
                     
-                    IconButton(
-                        onClick = onDuplicate,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.ContentCopy,
-                            contentDescription = "Duplicate",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    
                     if (!isActive) {
                         IconButton(
-                            onClick = onDelete,
+                            onClick = onDeleteLayout,
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
@@ -416,7 +367,7 @@ fun LayoutCard(
 }
 
 @Composable
-fun EmptyStateCard(
+fun EmptyLayoutsCard(
     category: LayoutCategory,
     onCreateLayout: () -> Unit,
     onBrowseTemplates: () -> Unit
@@ -493,6 +444,99 @@ fun EmptyStateCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Create Layout")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurrentLayoutCard(
+    layout: SoundboardLayout,
+    onEditLayout: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(8.dp, RoundedCornerShape(16.dp)),
+        colors = CardDefaults.cardColors(
+            containerColor = DarkBlueSurface
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Current Layout",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = NeonPinkLight,
+                    fontWeight = FontWeight.SemiBold
+                )
+                
+                Surface(
+                    color = NeonPink.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "ACTIVE",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NeonPink,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                layout.name,
+                style = MaterialTheme.typography.headlineSmall,
+                color = TextPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Text(
+                "${layout.gridColumns}×${layout.gridRows} grid • ${layout.gridColumns * layout.gridRows} buttons max",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+            
+            layout.description?.let { desc ->
+                Text(
+                    desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                OutlinedButton(
+                    onClick = onEditLayout,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Edit Layout")
                 }
             }
         }

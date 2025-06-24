@@ -400,8 +400,12 @@ class SoundboardBackupService @Inject constructor(
         
         val settings = if (json.has("settings")) {
             val settingsJson = json.getJSONObject("settings")
-            settingsJson.keys().asSequence().associateWith { key ->
-                settingsJson.get(key)
+            settingsJson.keys().asSequence().map { it as String }.associateWith { key ->
+                when (val value = settingsJson.get(key)) {
+                    is JSONObject -> value.toString()
+                    is JSONArray -> value.toString()
+                    else -> value.toString()
+                } as Any
             }
         } else null
         
@@ -420,7 +424,10 @@ class SoundboardBackupService @Inject constructor(
         } else null
         
         val pathMappings = if (json.has("path_mappings")) {
-            deserializePathMappings(json.getJSONObject("path_mappings"))
+            val mappingsJson = json.getJSONObject("path_mappings")
+            mappingsJson.keys().asSequence().map { it as String }.associateWith { key ->
+                mappingsJson.getString(key)
+            }
         } else null
         
         return BackupData(metadata, settings, layouts, soundButtons, pathMappings)
@@ -490,14 +497,14 @@ class SoundboardBackupService @Inject constructor(
         return SoundboardLayout(
             id = json.getLong("id"),
             name = json.getString("name"),
-            description = json.optString("description"),
+            description = json.optString("description", ""),
             isActive = json.getBoolean("is_active"),
             gridColumns = json.getInt("grid_columns"),
             gridRows = json.getInt("grid_rows"),
             createdAt = json.getLong("created_at"),
             updatedAt = json.getLong("updated_at"),
             isTemplate = json.getBoolean("is_template"),
-            templateCategory = json.optString("template_category"),
+            templateCategory = json.optString("template_category", ""),
             backgroundColor = json.getString("background_color"),
             accentColor = json.getString("accent_color"),
             buttonSpacing = json.getDouble("button_spacing").toFloat(),
@@ -506,9 +513,9 @@ class SoundboardBackupService @Inject constructor(
             maxButtons = json.getInt("max_buttons"),
             layoutPreset = com.soundboard.android.data.model.LayoutPreset.valueOf(json.getString("layout_preset")),
             exportVersion = json.getInt("export_version"),
-            originalAuthor = json.optString("original_author"),
-            downloadUrl = json.optString("download_url"),
-            tags = json.optString("tags")
+            originalAuthor = json.optString("original_author", ""),
+            downloadUrl = json.optString("download_url", ""),
+            tags = json.optString("tags", "")
         )
     }
     
@@ -545,7 +552,7 @@ class SoundboardBackupService @Inject constructor(
     }
     
     private fun deserializePathMappings(json: JSONObject): Map<String, String> {
-        return json.keys().asSequence().associateWith { key ->
+        return json.keys().asSequence().map { it as String }.associateWith { key ->
             json.getString(key)
         }
     }
