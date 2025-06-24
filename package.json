@@ -1,6 +1,34 @@
 {
+  "name": "android-soundboard-app",
+  "version": "1.0.0",
+  "description": "Android Soundboard Application with Computer Connectivity",
+  "main": "server/src/server.js",
+  "scripts": {
+    "setup": "node scripts/setup-environment.js",
+    "build": "npm run setup && npm run build:android",
+    "build:android": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(`${wrapper} clean assembleDebug`, {stdio:'inherit'});\"",
+    "build:windows": "gradlew.bat clean assembleDebug",
+    "build:unix": "./gradlew clean assembleDebug",
+    "server": "cd server && npm start",
+    "server:dev": "cd server && npm run dev",
+    "install:server": "cd server && npm install",
+    "clean": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(`${wrapper} clean`, {stdio:'inherit'});\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "android",
+    "soundboard",
+    "audio",
+    "streaming",
+    "cross-platform"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "node-fetch": "^3.3.2",
     "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }

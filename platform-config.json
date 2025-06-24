@@ -1,0 +1,106 @@
+{
+  "platforms": {
+    "windows": {
+      "sdk": {
+        "defaultPaths": [
+          "%LOCALAPPDATA%/Android/Sdk",
+          "%USERPROFILE%/AppData/Local/Android/Sdk",
+          "C:/Users/%USERNAME%/AppData/Local/Android/Sdk",
+          "./android-sdk"
+        ],
+        "pathSeparator": "\\",
+        "executable": ".exe"
+      },
+      "jdk": {
+        "defaultPaths": [
+          "%JAVA_HOME%",
+          "C:/Program Files/Eclipse Adoptium/jdk-21.0.7.6-hotspot",
+          "%USERPROFILE%/.jdks",
+          "./jdk-17.0.13+11",
+          "./jdk-17.0.2"
+        ]
+      },
+      "adb": {
+        "defaultPaths": [
+          "%LOCALAPPDATA%/Android/Sdk/platform-tools/adb.exe",
+          "%USERPROFILE%/AppData/Local/Android/Sdk/platform-tools/adb.exe",
+          "./android-sdk/platform-tools/adb.exe"
+        ],
+        "executable": "adb.exe"
+      },
+      "gradle": {
+        "wrapper": "gradlew.bat"
+      }
+    },
+    "darwin": {
+      "sdk": {
+        "defaultPaths": [
+          "$HOME/Library/Android/sdk",
+          "/usr/local/android-sdk",
+          "./android-sdk"
+        ],
+        "pathSeparator": "/",
+        "executable": ""
+      },
+      "jdk": {
+        "defaultPaths": [
+          "$JAVA_HOME",
+          "/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home",
+          "$HOME/.jdks",
+          "./jdk-17.0.13+11",
+          "./jdk-17.0.2"
+        ]
+      },
+      "adb": {
+        "defaultPaths": [
+          "$HOME/Library/Android/sdk/platform-tools/adb",
+          "/usr/local/android-sdk/platform-tools/adb",
+          "./android-sdk/platform-tools/adb"
+        ],
+        "executable": "adb"
+      },
+      "gradle": {
+        "wrapper": "./gradlew"
+      }
+    },
+    "linux": {
+      "sdk": {
+        "defaultPaths": [
+          "$HOME/Android/Sdk",
+          "/opt/android-sdk",
+          "./android-sdk"
+        ],
+        "pathSeparator": "/",
+        "executable": ""
+      },
+      "jdk": {
+        "defaultPaths": [
+          "$JAVA_HOME",
+          "/usr/lib/jvm/java-17-openjdk",
+          "$HOME/.jdks",
+          "./jdk-17.0.13+11",
+          "./jdk-17.0.2"
+        ]
+      },
+      "adb": {
+        "defaultPaths": [
+          "$HOME/Android/Sdk/platform-tools/adb",
+          "/opt/android-sdk/platform-tools/adb",
+          "./android-sdk/platform-tools/adb"
+        ],
+        "executable": "adb"
+      },
+      "gradle": {
+        "wrapper": "./gradlew"
+      }
+    }
+  },
+  "buildSettings": {
+    "compileSdk": 34,
+    "targetSdk": 34,
+    "minSdk": 24,
+    "javaVersion": "17",
+    "gradleVersion": "8.4",
+    "agpVersion": "8.1.0"
+  }
+} 

@@ -254,6 +254,7 @@ class DiagnosticsManager @Inject constructor(
             ComponentType.METRICS -> monitorMetricsHealth()
             ComponentType.NETWORK -> monitorNetworkHealth()
             ComponentType.SYSTEM -> monitorSystemHealth()
+            else -> monitorSystemHealth()
         }
         
         // Update component health map
@@ -610,6 +611,17 @@ class DiagnosticsManager @Inject constructor(
         )
     }
 
+    private suspend fun monitorUIHealth(): ComponentHealth {
+        // Placeholder for UI health monitoring
+        return ComponentHealth(
+            name = "UI",
+            status = HealthStatus.HEALTHY,
+            score = 0.95,
+            message = "UI components are responsive",
+            recommendations = emptyList()
+        )
+    }
+
     // =============================================================================
     // BOTTLENECK ANALYSIS
     // =============================================================================
@@ -876,6 +888,16 @@ class DiagnosticsManager @Inject constructor(
                 "Monitor system resources",
                 "Check for memory leaks",
                 "Review thread usage"
+            )
+            ComponentType.UI_MAIN,
+            ComponentType.UI_SETTINGS,
+            ComponentType.UI_DIALOG,
+            ComponentType.UI_LAYOUT,
+            ComponentType.UI_SOUNDBOARD,
+            ComponentType.UI_MONITORING -> listOf(
+                "Check for UI freezes or jank",
+                "Review layout complexity",
+                "Optimize resource usage in UI components"
             )
         }
     }

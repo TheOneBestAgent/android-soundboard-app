@@ -42,6 +42,10 @@ import com.soundboard.android.ui.screen.SettingsScreen
 import com.soundboard.android.ui.screen.LayoutManagerScreen
 import com.soundboard.android.ui.viewmodel.SoundboardViewModel
 import com.soundboard.android.data.repository.SettingsRepository
+import com.soundboard.android.diagnostics.ComponentType
+import com.soundboard.android.diagnostics.LogCategory
+import com.soundboard.android.diagnostics.LogEvent
+import com.soundboard.android.diagnostics.LogLevel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +65,20 @@ fun SoundboardScreen(
     var showAddButtonDialog by remember { mutableStateOf(false) }
     var selectedButtonForEdit by remember { mutableStateOf<SoundButton?>(null) }
     var clickedPosition by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    
+    if (showAddButtonDialog || selectedButtonForEdit != null) {
+        val isEditMode = selectedButtonForEdit != null
+        LaunchedEffect(isEditMode) {
+            viewModel.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_INTERACTION,
+                    message = if (isEditMode) "Showing Edit Sound Button Dialog" else "Showing Add Sound Button Dialog",
+                    component = ComponentType.UI_DIALOG
+                )
+            )
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -243,11 +261,30 @@ fun SoundboardScreen(
     
     // USB Connection Dialog
     if (showConnectionDialog) {
+        LaunchedEffect(Unit) {
+            viewModel.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_INTERACTION,
+                    message = "Showing USB Connection Dialog",
+                    component = ComponentType.UI_DIALOG
+                )
+            )
+        }
         val context = LocalContext.current
         UsbConnectionDialog(
-            onDismiss = { showConnectionDialog = false },
+            onDismiss = {
+                viewModel.logEvent(
+                    LogEvent(
+                        level = LogLevel.INFO,
+                        category = LogCategory.USER_INTERACTION,
+                        message = "USB Connection Dialog dismissed",
+                        component = ComponentType.UI_DIALOG
+                    )
+                )
+                showConnectionDialog = false
+            },
             onConnect = {
-                // Connect via USB using localhost (ADB port forwarding)
                 viewModel.connectViaUSB(context)
                 showConnectionDialog = false
             },
@@ -265,13 +302,19 @@ fun SoundboardScreen(
         val suggestedPos = clickedPosition
         AddSoundButtonDialog(
             onDismiss = { 
+                viewModel.logEvent(
+                    LogEvent(
+                        level = LogLevel.INFO,
+                        category = LogCategory.USER_INTERACTION,
+                        message = "Add Sound Button Dialog dismissed",
+                        component = ComponentType.UI_DIALOG
+                    )
+                )
                 showAddButtonDialog = false
-                clickedPosition = null
             },
             onSave = { name, filePath, positionX, positionY, color, iconName, isLocalFile ->
                 viewModel.addSoundButton(name, filePath, positionX, positionY, color, iconName, isLocalFile)
                 showAddButtonDialog = false
-                clickedPosition = null
             },
             availableFiles = uiState.availableAudioFiles,
             suggestedPosition = suggestedPos,
@@ -298,17 +341,27 @@ fun SoundboardScreen(
     // Edit Button Dialog
     if (selectedButtonForEdit != null) {
         AddSoundButtonDialog(
-            onDismiss = { selectedButtonForEdit = null },
+            onDismiss = {
+                viewModel.logEvent(
+                    LogEvent(
+                        level = LogLevel.INFO,
+                        category = LogCategory.USER_INTERACTION,
+                        message = "Edit SoundButton Dialog dismissed",
+                        component = ComponentType.UI_DIALOG
+                    )
+                )
+                selectedButtonForEdit = null
+            },
             onSave = { name, filePath, positionX, positionY, color, iconName, isLocalFile ->
                 viewModel.updateSoundButton(
                     selectedButtonForEdit!!.copy(
                         name = name,
                         filePath = filePath,
-                        isLocalFile = isLocalFile,
                         positionX = positionX,
                         positionY = positionY,
                         color = color,
-                        iconName = iconName
+                        iconName = iconName,
+                        isLocalFile = isLocalFile
                     )
                 )
                 selectedButtonForEdit = null

@@ -1,5 +1,6 @@
 package com.soundboard.android.ui.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.soundboard.android.data.model.ConnectionHistory
@@ -7,10 +8,22 @@ import com.soundboard.android.data.model.SoundButton
 import com.soundboard.android.data.model.SoundboardLayout
 import com.soundboard.android.data.model.LayoutPreset
 import com.soundboard.android.data.repository.SoundboardRepository
+import com.soundboard.android.data.repository.SettingsRepository
+import com.soundboard.android.diagnostics.DiagnosticsManager
+import com.soundboard.android.diagnostics.LoggingManager
+import com.soundboard.android.diagnostics.LogCategory
+import com.soundboard.android.diagnostics.ComponentType
+import com.soundboard.android.diagnostics.LogEvent
+import com.soundboard.android.diagnostics.LogLevel
 import com.soundboard.android.network.ConnectionStatus
 import com.soundboard.android.network.api.AudioFile
+import com.soundboard.android.network.ConnectionManager
+import com.soundboard.android.network.SocketManager
 import com.soundboard.android.ui.component.LayoutTemplate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -50,21 +63,29 @@ data class SoundboardUiState(
 
 @HiltViewModel
 class SoundboardViewModel @Inject constructor(
-    private val repository: SoundboardRepository
+    private val soundboardRepository: SoundboardRepository,
+    private val settingsRepository: SettingsRepository,
+    private val socketManager: SocketManager,
+    private val connectionManager: ConnectionManager,
+    private val diagnosticsManager: DiagnosticsManager,
+    private val loggingManager: LoggingManager
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(SoundboardUiState())
     val uiState: StateFlow<SoundboardUiState> = _uiState.asStateFlow()
     
+    private val viewModelJob = SupervisorJob()
+    private val viewModelScope = CoroutineScope(Dispatchers.Main + viewModelJob)
+    
     // Get real-time connection status from SocketManager
-    val connectionStatus: StateFlow<ConnectionStatus> = repository.getSocketManager().connectionStatus
-    val serverInfo: StateFlow<String?> = repository.getSocketManager().serverInfo
+    val connectionStatus: StateFlow<ConnectionStatus> = socketManager.connectionStatus
+    val serverInfo: StateFlow<String?> = socketManager.serverInfo
     
     // Phase 3.3: Layout Management - LiveData for compatibility with existing screens
-    val layouts: StateFlow<List<SoundboardLayout>> = repository.getAllLayouts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
+    val layouts: StateFlow<List<SoundboardLayout>> = soundboardRepository.getAllLayouts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
     val currentLayout: StateFlow<SoundboardLayout?> = flow {
         while (true) {
-            emit(repository.getActiveLayout())
+            emit(soundboardRepository.getActiveLayout())
             kotlinx.coroutines.delay(1000)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), null)
@@ -82,7 +103,7 @@ class SoundboardViewModel @Inject constructor(
     private fun initializeData() {
         viewModelScope.launch {
             try {
-                repository.initializeDefaultLayout()
+                soundboardRepository.initializeDefaultLayout()
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to initialize: ${e.message}") }
             }
@@ -91,7 +112,7 @@ class SoundboardViewModel @Inject constructor(
     
     private fun observeSoundButtons() {
         viewModelScope.launch {
-            repository.getAllSoundButtons()
+            soundboardRepository.getAllSoundButtons()
                 .catch { e -> 
                     _uiState.update { it.copy(errorMessage = "Failed to load sound buttons: ${e.message}") }
                 }
@@ -106,7 +127,7 @@ class SoundboardViewModel @Inject constructor(
             // Poll for active layout changes
             flow {
                 while (true) {
-                    emit(repository.getActiveLayout())
+                    emit(soundboardRepository.getActiveLayout())
                     kotlinx.coroutines.delay(1000) // Check every second
                 }
             }
@@ -121,12 +142,21 @@ class SoundboardViewModel @Inject constructor(
     
     fun connectToServer(ipAddress: String, port: Int) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Attempting to connect to server",
+                    metadata = mapOf("ipAddress" to ipAddress, "port" to port.toString()),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
             try {
                 // Connect via repository
-                repository.connectToServer(ipAddress, port)
+                soundboardRepository.connectToServer(ipAddress, port)
                 
                 // Add to connection history
-                repository.addOrUpdateConnection("Computer", ipAddress, port)
+                soundboardRepository.addOrUpdateConnection("Computer", ipAddress, port)
                 
                 // Test the connection and load audio files
                 refreshAudioFiles()
@@ -137,11 +167,20 @@ class SoundboardViewModel @Inject constructor(
         }
     }
     
-    fun connectViaUSB(context: android.content.Context) {
+    fun connectViaUSB(context: Context) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Attempting to connect via USB",
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 // Connect via USB using ADB reverse port forwarding
-                repository.getSocketManager().connectViaUSB(
+                socketManager.connectViaUSB(
                     context = context,
                     serverUrl = "http://localhost:8080",
                     onResult = { success, message ->
@@ -155,10 +194,10 @@ class SoundboardViewModel @Inject constructor(
                 )
                 
                 // Set up the API service for HTTP requests
-                repository.connectToServer("localhost", 8080)
+                soundboardRepository.connectToServer("localhost", 8080)
                 
                 // Add to connection history
-                repository.addOrUpdateConnection("USB Device", "localhost", 8080)
+                soundboardRepository.addOrUpdateConnection("USB Device", "localhost", 8080)
                 
                 // Wait a moment for connection to establish, then load audio files
                 kotlinx.coroutines.delay(1000)
@@ -171,7 +210,17 @@ class SoundboardViewModel @Inject constructor(
     }
     
     fun disconnectFromServer() {
-        repository.disconnectFromServer()
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Disconnecting from server",
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            soundboardRepository.disconnectFromServer()
+        }
     }
     
     fun playSoundButton(soundButton: SoundButton) {
@@ -189,9 +238,18 @@ class SoundboardViewModel @Inject constructor(
         _uiState.update { it.copy(currentlyPlayingButtonId = soundButton.id) }
         
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Playing sound",
+                    metadata = mapOf("soundId" to soundButton.id.toString(), "soundName" to soundButton.name),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
             try {
                 android.util.Log.d("SoundboardViewModel", "🔄 CALLING REPOSITORY.playSound()")
-                val result = repository.playSound(soundButton)
+                val result = soundboardRepository.playSound(soundButton)
                 android.util.Log.d("SoundboardViewModel", "✅ REPOSITORY RESULT: $result")
                 _uiState.update { it.copy(errorMessage = null) }
                 
@@ -216,6 +274,15 @@ class SoundboardViewModel @Inject constructor(
     
     fun addSoundButton(name: String, filePath: String, positionX: Int, positionY: Int, color: String = "#2196F3", iconName: String = "music_note", isLocalFile: Boolean = false) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Adding new sound button",
+                    metadata = mapOf("name" to name, "filePath" to filePath, "isLocalFile" to isLocalFile.toString()),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
             try {
                 val soundButton = SoundButton(
                     name = name,
@@ -227,7 +294,7 @@ class SoundboardViewModel @Inject constructor(
                     iconName = iconName,
                     volume = 1.0f
                 )
-                repository.insertSoundButton(soundButton)
+                soundboardRepository.insertSoundButton(soundButton)
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to add sound button: ${e.message}") }
@@ -237,8 +304,17 @@ class SoundboardViewModel @Inject constructor(
     
     fun updateSoundButton(soundButton: SoundButton) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Updating sound button",
+                    metadata = mapOf("soundId" to soundButton.id.toString()),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
             try {
-                repository.updateSoundButton(soundButton.copy(updatedAt = System.currentTimeMillis()))
+                soundboardRepository.updateSoundButton(soundButton.copy(updatedAt = System.currentTimeMillis()))
                 
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to update sound button: ${e.message}") }
@@ -253,7 +329,7 @@ class SoundboardViewModel @Inject constructor(
                     volume = volume.coerceIn(0f, 1f),
                     updatedAt = System.currentTimeMillis()
                 )
-                repository.updateSoundButton(updatedButton)
+                soundboardRepository.updateSoundButton(updatedButton)
                 
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to update volume: ${e.message}") }
@@ -271,7 +347,7 @@ class SoundboardViewModel @Inject constructor(
                         volume = newVolume,
                         updatedAt = System.currentTimeMillis()
                     )
-                    repository.updateSoundButton(updatedButton)
+                    soundboardRepository.updateSoundButton(updatedButton)
                 }
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
@@ -293,7 +369,7 @@ class SoundboardViewModel @Inject constructor(
                         volume = normalizedVolume,
                         updatedAt = System.currentTimeMillis()
                     )
-                    repository.updateSoundButton(updatedButton)
+                    soundboardRepository.updateSoundButton(updatedButton)
                 }
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
@@ -311,7 +387,7 @@ class SoundboardViewModel @Inject constructor(
                         volume = 1.0f,
                         updatedAt = System.currentTimeMillis()
                     )
-                    repository.updateSoundButton(updatedButton)
+                    soundboardRepository.updateSoundButton(updatedButton)
                 }
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
@@ -356,8 +432,17 @@ class SoundboardViewModel @Inject constructor(
     
     fun deleteSoundButton(soundButton: SoundButton) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Deleting sound button",
+                    metadata = mapOf("soundId" to soundButton.id.toString(), "soundName" to soundButton.name),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
             try {
-                repository.deleteSoundButton(soundButton)
+                soundboardRepository.deleteSoundButton(soundButton)
                 
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to delete sound button: ${e.message}") }
@@ -371,8 +456,17 @@ class SoundboardViewModel @Inject constructor(
     
     fun refreshAudioFiles() {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Refreshing remote audio files",
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                val result = repository.getAvailableAudioFiles()
+                val result = soundboardRepository.getAvailableAudioFiles()
                 result.fold(
                     onSuccess = { audioFiles ->
                         _uiState.update { it.copy(availableAudioFiles = audioFiles) }
@@ -391,7 +485,7 @@ class SoundboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingLocalFiles = true) }
             try {
-                val result = repository.getLocalAudioFiles()
+                val result = soundboardRepository.getLocalAudioFiles()
                 result.fold(
                     onSuccess = { audioFiles ->
                         _uiState.update { 
@@ -425,10 +519,10 @@ class SoundboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingLocalFiles = true) }
             try {
-                val result = repository.getDirectoryContent(directoryPath)
+                val result = soundboardRepository.getDirectoryContent(directoryPath)
                 result.fold(
                     onSuccess = { content ->
-                        val breadcrumbs = repository.getBreadcrumbs(directoryPath)
+                        val breadcrumbs = soundboardRepository.getBreadcrumbs(directoryPath)
                         _uiState.update { 
                             it.copy(
                                 currentDirectoryPath = directoryPath,
@@ -490,8 +584,16 @@ class SoundboardViewModel @Inject constructor(
     
     private fun loadCommonDirectories() {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Loading common directories",
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
             try {
-                val directories = repository.getCommonAudioDirectories()
+                val directories = soundboardRepository.getCommonAudioDirectories()
                 _uiState.update { it.copy(commonDirectories = directories) }
             } catch (e: Exception) {
                 // Don't show error for this, just use empty list
@@ -502,7 +604,7 @@ class SoundboardViewModel @Inject constructor(
     
     private fun observePlayResponses() {
         viewModelScope.launch {
-            repository.getSocketManager().playResponses
+            socketManager.playResponses
                 .filterNotNull()
                 .collect { response ->
                     val message = if (response.status == "success") {
@@ -514,7 +616,7 @@ class SoundboardViewModel @Inject constructor(
                     
                     // Clear response after showing it
                     kotlinx.coroutines.delay(3000)
-                    repository.getSocketManager().clearPlayResponse()
+                    socketManager.clearPlayResponse()
                     _uiState.update { it.copy(lastPlayResponse = null) }
                 }
         }
@@ -522,7 +624,7 @@ class SoundboardViewModel @Inject constructor(
     
     private fun observeConnectionHistory() {
         viewModelScope.launch {
-            repository.getAllConnectionHistory()
+            soundboardRepository.getAllConnectionHistory()
                 .catch { e ->
                     _uiState.update { it.copy(errorMessage = "Failed to load connection history: ${e.message}") }
                 }
@@ -534,7 +636,7 @@ class SoundboardViewModel @Inject constructor(
     
     private fun loadLastUsedConnection() {
         viewModelScope.launch {
-            val lastUsedConnection = repository.getLastUsedConnection()
+            val lastUsedConnection = soundboardRepository.getLastUsedConnection()
             if (lastUsedConnection != null) {
                 _uiState.update { it.copy(lastUsedIpAddress = lastUsedConnection.ipAddress, lastUsedPort = lastUsedConnection.port) }
             }
@@ -547,6 +649,15 @@ class SoundboardViewModel @Inject constructor(
     
     fun createLayout(name: String, preset: LayoutPreset) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Creating layout",
+                    metadata = mapOf("name" to name, "preset" to preset.toString()),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
             try {
                 val layout = SoundboardLayout(
                     name = name,
@@ -557,7 +668,7 @@ class SoundboardViewModel @Inject constructor(
                     isTemplate = false,
                     maxButtons = preset.columns * preset.rows
                 )
-                repository.insertLayout(layout)
+                soundboardRepository.insertLayout(layout)
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to create layout: ${e.message}") }
@@ -579,7 +690,7 @@ class SoundboardViewModel @Inject constructor(
                     accentColor = template.accentColor,
                     maxButtons = template.preset.columns * template.preset.rows
                 )
-                repository.insertLayout(layout)
+                soundboardRepository.insertLayout(layout)
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to create layout from template: ${e.message}") }
@@ -591,7 +702,7 @@ class SoundboardViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // Use the atomic transaction method to switch layouts
-                repository.switchActiveLayout(layout.id)
+                soundboardRepository.switchActiveLayout(layout.id)
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to switch layout: ${e.message}") }
@@ -601,24 +712,41 @@ class SoundboardViewModel @Inject constructor(
     
     fun duplicateLayout(layout: SoundboardLayout) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Duplicating layout",
+                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
             try {
                 val duplicatedLayout = layout.copy(
-                    id = 0, // Let Room auto-generate new ID
+                    id = 0, // Let Room generate a new ID
                     name = "${layout.name} (Copy)",
-                    isActive = false,
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis()
                 )
-                repository.insertLayout(duplicatedLayout)
+                soundboardRepository.insertLayout(duplicatedLayout)
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = "Failed to duplicate layout: ${e.message}") }
+                _uiState.update { it.copy(errorMessage = "Failed to duplicate layout: ${e.gessage}") }
             }
         }
     }
     
     fun deleteLayout(layout: SoundboardLayout) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Deleting layout",
+                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
             try {
                 if (layout.isActive) {
                     _uiState.update { it.copy(errorMessage = "Cannot delete active layout") }
@@ -626,7 +754,7 @@ class SoundboardViewModel @Inject constructor(
                 }
                 
                 // TODO: Delete sound buttons for layout when layout relationship is implemented
-                repository.deleteLayout(layout)
+                soundboardRepository.deleteLayout(layout)
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to delete layout: ${e.message}") }
@@ -636,8 +764,17 @@ class SoundboardViewModel @Inject constructor(
     
     fun updateLayout(layout: SoundboardLayout) {
         viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Updating layout",
+                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
             try {
-                repository.updateLayout(layout.copy(updatedAt = System.currentTimeMillis()))
+                soundboardRepository.updateLayout(layout.copy(updatedAt = System.currentTimeMillis()))
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to update layout: ${e.message}") }
@@ -665,6 +802,255 @@ class SoundboardViewModel @Inject constructor(
                 _uiState.update { it.copy(errorMessage = "Layout import functionality coming soon") }
             } catch (e: Exception) {
                 _uiState.update { it.copy(errorMessage = "Failed to import layout: ${e.message}") }
+            }
+        }
+    }
+    
+    fun updateSoundButtonName(soundButton: SoundButton, newName: String) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Updating sound button name",
+                    metadata = mapOf("soundId" to soundButton.id.toString(), "oldName" to soundButton.name, "newName" to newName),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            if (soundButton.id > 0) {
+                try {
+                    val updatedButton = soundButton.copy(
+                        name = newName,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    soundboardRepository.updateSoundButton(updatedButton)
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(errorMessage = "Failed to update sound button name: ${e.message}") }
+                }
+            }
+        }
+    }
+
+    fun updateSoundButtonColor(soundButton: SoundButton, newColor: String) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Updating sound button color",
+                    metadata = mapOf("soundId" to soundButton.id.toString(), "newColor" to newColor),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            if (soundButton.id > 0) {
+                try {
+                    val updatedButton = soundButton.copy(
+                        color = newColor,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    soundboardRepository.updateSoundButton(updatedButton)
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(errorMessage = "Failed to update sound button color: ${e.message}") }
+                }
+            }
+        }
+    }
+
+    fun updateSoundButtonIcon(soundButton: SoundButton, newIcon: String) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Updating sound button icon",
+                    metadata = mapOf("soundId" to soundButton.id.toString(), "newIcon" to newIcon),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            if (soundButton.id > 0) {
+                try {
+                    val updatedButton = soundButton.copy(
+                        iconName = newIcon,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    soundboardRepository.updateSoundButton(updatedButton)
+                } catch (e: Exception) {
+                    _uiState.update { it.copy(errorMessage = "Failed to update sound button icon: ${e.message}") }
+                }
+            }
+        }
+    }
+    
+    fun fetchAudioFiles() {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Fetching remote audio files",
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                // ... existing code ...
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error fetching remote audio files: ${e.message}") }
+            }
+        }
+    }
+
+    fun fetchLocalAudioFiles() {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Fetching local audio files",
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            _uiState.update { it.copy(isLoadingLocalFiles = true) }
+            try {
+                // ... existing code ...
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error fetching local audio files: ${e.message}") }
+            }
+        }
+    }
+
+    fun browseLocalDirectory(directoryPath: String) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Browsing local directory",
+                    metadata = mapOf("path" to directoryPath),
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            _uiState.update { it.copy(isLoadingLocalFiles = true) }
+            try {
+                // ... existing code ...
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error browsing local directory: ${e.message}") }
+            }
+        }
+    }
+
+    fun fetchCommonDirectories() {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Fetching common audio directories",
+                    component = ComponentType.UI_SOUNDBOARD
+                )
+            )
+            try {
+                val directories = soundboardRepository.getCommonAudioDirectories()
+                // ... existing code ...
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Error fetching common audio directories: ${e.message}") }
+            }
+        }
+    }
+
+    // =================================================================================
+    // PHASE 3.3: LAYOUT MANAGEMENT
+    // =================================================================================
+
+    fun createLayoutFromTemplate(layoutName: String, template: LayoutTemplate) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Creating layout from template",
+                    metadata = mapOf("layoutName" to layoutName, "template" to template.name),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
+            try {
+                val layout = SoundboardLayout(
+                    name = layoutName,
+                    rows = template.preset.rows,
+                    columns = template.preset.columns,
+                    maxButtons = template.preset.columns * template.preset.rows
+                )
+                soundboardRepository.insertLayout(layout)
+                _uiState.update { it.copy(errorMessage = null) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Failed to create layout: ${e.message}") }
+            }
+        }
+    }
+
+    fun setActiveLayout(layout: SoundboardLayout) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Setting active layout",
+                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
+            try {
+                // Use the atomic transaction method to switch layouts
+                soundboardRepository.switchActiveLayout(layout.id)
+                _uiState.update { it.copy(errorMessage = null) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Failed to switch layout: ${e.message}") }
+            }
+        }
+    }
+
+    fun deleteLayout(layout: SoundboardLayout) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Deleting layout",
+                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
+            try {
+                if (layout.isActive) {
+                    _uiState.update { it.copy(errorMessage = "Cannot delete active layout") }
+                    return@launch
+                }
+                
+                // TODO: Delete sound buttons for layout when layout relationship is implemented
+                soundboardRepository.deleteLayout(layout)
+                _uiState.update { it.copy(errorMessage = null) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Failed to delete layout: ${e.message}") }
+            }
+        }
+    }
+
+    fun updateLayout(layout: SoundboardLayout) {
+        viewModelScope.launch {
+            loggingManager.logEvent(
+                LogEvent(
+                    level = LogLevel.INFO,
+                    category = LogCategory.USER_ACTION,
+                    message = "Updating layout",
+                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
+                    component = ComponentType.UI_LAYOUT
+                )
+            )
+            try {
+                soundboardRepository.updateLayout(layout.copy(updatedAt = System.currentTimeMillis()))
+                _uiState.update { it.copy(errorMessage = null) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(errorMessage = "Failed to update layout: ${e.message}") }
             }
         }
     }

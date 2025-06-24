@@ -30,6 +30,11 @@ import com.soundboard.android.data.repository.SettingsRepository
 import com.soundboard.android.network.NetworkDiscoveryService
 import com.soundboard.android.network.MultiTransportManager
 import com.soundboard.android.network.ConnectionAnalytics
+import com.soundboard.android.diagnostics.ComponentType
+import com.soundboard.android.diagnostics.LogCategory
+import com.soundboard.android.diagnostics.LogEvent
+import com.soundboard.android.diagnostics.LogLevel
+import com.soundboard.android.ui.viewmodel.logInteraction
 import javax.inject.Inject
 
 data class SettingsItem(
@@ -99,19 +104,28 @@ fun SettingsScreen(
                     title = "Connection Settings",
                     subtitle = "Configure server connection",
                     icon = Icons.Default.Wifi,
-                    onClick = { showConnectionDialog = true }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Connection Settings", ComponentType.UI_SETTINGS)
+                        showConnectionDialog = true
+                    }
                 ),
                 SettingsItem(
                     title = "USB Setup Guide",
                     subtitle = "Setup ADB connection over USB",
                     icon = Icons.Default.Usb,
-                    onClick = { showUsbConnectionDialog = true }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on USB Setup Guide", ComponentType.UI_SETTINGS)
+                        showUsbConnectionDialog = true
+                    }
                 ),
                 SettingsItem(
                     title = "Analytics Dashboard",
                     subtitle = "View connection analytics and performance metrics",
                     icon = Icons.Default.Analytics,
-                    onClick = { showAnalyticsDashboard = true }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Analytics Dashboard", ComponentType.UI_SETTINGS)
+                        showAnalyticsDashboard = true
+                    }
                 )
             )
         ),
@@ -122,19 +136,28 @@ fun SettingsScreen(
                     title = "Download Sounds",
                     subtitle = "Browse and download from MyInstant.com",
                     icon = Icons.Default.Download,
-                    onClick = { showMyInstantDownloader = true }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Download Sounds", ComponentType.UI_SETTINGS)
+                        showMyInstantDownloader = true
+                    }
                 ),
                 SettingsItem(
                     title = "Download Location",
                     subtitle = "Currently: ${formatDownloadLocation(downloadLocation)}",
                     icon = Icons.Default.Folder,
-                    onClick = { showDownloadLocationDialog = true }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Download Location", ComponentType.UI_SETTINGS)
+                        showDownloadLocationDialog = true
+                    }
                 ),
                 SettingsItem(
                     title = "Layout Manager",
                     subtitle = "Manage soundboard layouts",
                     icon = Icons.Default.GridView,
-                    onClick = { onNavigateToLayoutManager() }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Layout Manager", ComponentType.UI_SETTINGS)
+                        onNavigateToLayoutManager()
+                    }
                 )
             )
         ),
@@ -145,19 +168,28 @@ fun SettingsScreen(
                     title = "Appearance",
                     subtitle = "Themes, colors, and visual settings",
                     icon = Icons.Default.Palette,
-                    onClick = { showAppearanceSettings = true }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Appearance", ComponentType.UI_SETTINGS)
+                        showAppearanceSettings = true
+                    }
                 ),
                 SettingsItem(
                     title = "Button Icons",
                     subtitle = "Customize button icons and styles",
                     icon = Icons.Default.Apps,
-                    onClick = { /* TODO: Icon picker */ }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Button Icons", ComponentType.UI_SETTINGS)
+                        /* TODO: Icon picker */
+                    }
                 ),
                 SettingsItem(
                     title = "Grid Layout",
                     subtitle = "Adjust grid size and spacing",
                     icon = Icons.Default.Dashboard,
-                    onClick = { showGridLayoutSettings = true }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Grid Layout", ComponentType.UI_SETTINGS)
+                        showGridLayoutSettings = true
+                    }
                 )
             )
         ),
@@ -168,13 +200,19 @@ fun SettingsScreen(
                     title = "Volume Settings",
                     subtitle = "Global volume and normalization",
                     icon = Icons.Default.VolumeUp,
-                    onClick = { /* TODO: Volume settings */ }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Volume Settings", ComponentType.UI_SETTINGS)
+                        /* TODO: Volume settings */
+                    }
                 ),
                 SettingsItem(
                     title = "Audio Quality",
                     subtitle = "Playback quality and format settings",
                     icon = Icons.Default.HighQuality,
-                    onClick = { /* TODO: Audio quality settings */ }
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Audio Quality", ComponentType.UI_SETTINGS)
+                        /* TODO: Audio quality settings */
+                    }
                 )
             )
         )
@@ -233,8 +271,14 @@ fun SettingsScreen(
     
     // Dialogs
     if (showConnectionDialog) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Connection Dialog", ComponentType.UI_DIALOG)
+        }
         ConnectionDialog(
-            onDismiss = { showConnectionDialog = false },
+            onDismiss = {
+                viewModel.logInteraction("Connection Dialog dismissed", ComponentType.UI_DIALOG)
+                showConnectionDialog = false
+            },
             onConnect = { host, port ->
                 viewModel.connectToServer(host, port)
                 showConnectionDialog = false
@@ -249,16 +293,22 @@ fun SettingsScreen(
             onStartDiscovery = {
                 networkDiscoveryService.startDiscovery()
             },
-            onRefreshDiscovery = {
-                networkDiscoveryService.refreshDiscovery()
+            onStopDiscovery = {
+                networkDiscoveryService.stopDiscovery()
             }
         )
     }
     
     if (showUsbConnectionDialog) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing USB Connection Dialog", ComponentType.UI_DIALOG)
+        }
         val context = LocalContext.current
         UsbConnectionDialog(
-            onDismiss = { showUsbConnectionDialog = false },
+            onDismiss = {
+                viewModel.logInteraction("USB Connection Dialog dismissed", ComponentType.UI_DIALOG)
+                showUsbConnectionDialog = false
+            },
             onConnect = {
                 viewModel.connectViaUSB(context)
                 showUsbConnectionDialog = false
@@ -267,49 +317,64 @@ fun SettingsScreen(
     }
     
     if (showMyInstantDownloader) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing MyInstantDownloader", ComponentType.UI_DIALOG)
+        }
         MyInstantDownloader(
-            onDismiss = { showMyInstantDownloader = false },
-            onDownloadComplete = { fileName, filePath ->
-                // TODO: Add downloaded file to soundboard
+            onDismiss = {
+                viewModel.logInteraction("MyInstantDownloader dismissed", ComponentType.UI_DIALOG)
                 showMyInstantDownloader = false
+            },
+            onDownload = { audioFile ->
+                // Pass to viewModel for handling
+                viewModel.downloadMyInstantSound(audioFile)
+                snackbarMessage = "Downloading ${audioFile.name}..."
             }
         )
     }
     
     if (showAppearanceSettings) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Appearance Settings Dialog", ComponentType.UI_DIALOG)
+        }
         AppearanceSettingsDialog(
-            onDismiss = { showAppearanceSettings = false },
-            currentTheme = "System", // TODO: Get from settings
-            currentAccentColor = "Blue", // TODO: Get from settings  
-            isDarkTheme = false, // TODO: Get from settings
-            onThemeChange = { theme ->
-                // TODO: Update theme in settings
+            onDismiss = {
+                viewModel.logInteraction("Appearance Settings Dialog dismissed", ComponentType.UI_DIALOG)
+                showAppearanceSettings = false
             },
-            onAccentColorChange = { color ->
-                // TODO: Update accent color in settings
-            },
-            onDarkThemeToggle = { isDark ->
-                // TODO: Update dark theme setting
-            }
+            settingsRepository = settingsRepository
         )
     }
     
     if (showDownloadLocationDialog) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Download Location Dialog", ComponentType.UI_DIALOG)
+        }
         DownloadLocationDialog(
-            currentLocation = downloadLocation,
+            onDismiss = {
+                viewModel.logInteraction("Download Location Dialog dismissed", ComponentType.UI_DIALOG)
+                showDownloadLocationDialog = false
+            },
             onLocationSelected = { location ->
                 settingsRepository.setDownloadLocation(location)
+                showDownloadLocationDialog = false
             },
-            onDismiss = { showDownloadLocationDialog = false }
+            currentLocation = downloadLocation
         )
     }
     
     if (showGridLayoutSettings) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Grid Layout Settings Dialog", ComponentType.UI_DIALOG)
+        }
         val currentLayout by viewModel.currentLayout.collectAsState()
         currentLayout?.let { layout ->
             GridLayoutSettingsDialog(
                 currentLayout = layout,
-                onDismiss = { showGridLayoutSettings = false },
+                onDismiss = {
+                    viewModel.logInteraction("Grid Layout Settings Dialog dismissed", ComponentType.UI_DIALOG)
+                    showGridLayoutSettings = false
+                },
                 onSaveLayout = { updatedLayout ->
                     viewModel.updateLayout(updatedLayout)
                     showGridLayoutSettings = false
@@ -319,10 +384,16 @@ fun SettingsScreen(
     }
     
     if (showAnalyticsDashboard) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Analytics Dashboard", ComponentType.UI_MONITORING)
+        }
         AnalyticsDashboard(
             multiTransportManager = multiTransportManager,
             connectionAnalytics = connectionAnalytics,
-            onClose = { showAnalyticsDashboard = false }
+            onClose = {
+                viewModel.logInteraction("Analytics Dashboard dismissed", ComponentType.UI_MONITORING)
+                showAnalyticsDashboard = false
+            }
         )
     }
 }

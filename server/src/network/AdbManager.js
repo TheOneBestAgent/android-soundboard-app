@@ -1,13 +1,15 @@
-const { spawn, exec } = require('child_process');
+const { exec } = require('child_process');
 const path = require('path');
 const os = require('os');
 
 class AdbManager {
-    constructor() {
+    constructor(adbPath) {
         this.isConnected = false;
         this.connectedDevices = [];
         this.forwardedPorts = new Set();
-        this.adbPath = this.findAdbPath();
+        this.adbPath = adbPath || 'adb';
+        this.devices = new Map();
+        console.log(`🔧 AdbManager initialized with ADB path: ${this.adbPath}`);
     }
 
     findAdbPath() {
@@ -50,7 +52,7 @@ class AdbManager {
 
     async checkAdbAvailable() {
         return new Promise((resolve) => {
-            exec(`${this.adbPath} version`, (error, stdout, stderr) => {
+            exec(`"${this.adbPath}" --version`, (error, stdout, stderr) => {
                 if (error) {
                     console.error('ADB not available:', error.message);
                     resolve(false);
@@ -62,43 +64,52 @@ class AdbManager {
         });
     }
 
-    async listDevices() {
+    async getDevices() {
         return new Promise((resolve, reject) => {
-            exec(`${this.adbPath} devices`, (error, stdout, stderr) => {
+            exec(`"${this.adbPath}" devices -l`, (error, stdout, stderr) => {
                 if (error) {
-                    reject(error);
+                    reject(new Error(`ADB devices command failed: ${error.message}`));
                     return;
                 }
-
-                const lines = stdout.split('\n');
-                const devices = [];
-                
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (line && !line.startsWith('*')) {
-                        const [deviceId, status] = line.split('\t');
-                        if (deviceId && status) {
-                            devices.push({
-                                id: deviceId,
-                                status: status,
-                                connected: status === 'device'
-                            });
-                        }
-                    }
-                }
-
-                this.connectedDevices = devices;
-                this.isConnected = devices.some(device => device.connected);
+                const devices = this.parseAdbDevicesOutput(stdout);
                 resolve(devices);
             });
         });
     }
 
-    async reversePort(devicePort, computerPort, deviceId = null) {
+    parseAdbDevicesOutput(output) {
+        const lines = output.split(/\\r?\\n/);
+        const devices = [];
+        for (const line of lines) {
+            if (line.trim() === '' || line.startsWith('List of devices')) {
+                continue;
+            }
+            const parts = line.split(/\s+/);
+            const serial = parts[0];
+            if (serial) {
+                const model = parts.find(p => p.startsWith('model:'))?.split(':')[1] || 'Unknown';
+                devices.push({ serial, model });
+            }
+        }
+        return devices;
+    }
+
+    async forwardPort(deviceSerial, localPort, remotePort) {
         return new Promise((resolve, reject) => {
-            const deviceArg = deviceId ? `-s ${deviceId}` : '';
-            const command = `${this.adbPath} ${deviceArg} reverse tcp:${devicePort} tcp:${computerPort}`;
-            
+            const command = `"${this.adbPath}" -s ${deviceSerial} forward tcp:${localPort} tcp:${remotePort}`;
+            exec(command, (error, stdout, stderr) => {
+                if (error) {
+                    reject(new Error(`Failed to forward port for ${deviceSerial}: ${stderr}`));
+                } else {
+                    resolve(stdout);
+                }
+            });
+        });
+    }
+
+    async reversePort(deviceSerial, remotePort, localPort) {
+        return new Promise((resolve, reject) => {
+            const command = `"${this.adbPath}" -s ${deviceSerial} reverse tcp:${remotePort} tcp:${localPort}`;
             exec(command, (error, stdout, stderr) => {
                 if (error) {
                     // Don't log if it's just a "Address already in use" error - that means forwarding already exists
@@ -107,7 +118,7 @@ class AdbManager {
                     }
                     reject(error);
                 } else {
-                    console.log(`Reverse port forwarding established: device:${devicePort} -> computer:${computerPort}`);
+                    console.log(`Reverse port forwarding established: device:${remotePort} -> computer:${localPort}`);
                     resolve(true);
                 }
             });
@@ -117,7 +128,7 @@ class AdbManager {
     async removeReversePort(devicePort, deviceId = null) {
         return new Promise((resolve, reject) => {
             const deviceArg = deviceId ? `-s ${deviceId}` : '';
-            const command = `${this.adbPath} ${deviceArg} reverse --remove tcp:${devicePort}`;
+            const command = `"${this.adbPath}" ${deviceArg} reverse --remove tcp:${devicePort}`;
             
             exec(command, (error, stdout, stderr) => {
                 if (error) {
@@ -159,7 +170,7 @@ class AdbManager {
             while (retryCount < maxRetries) {
                 try {
                     // Reverse forward: device port 8080 to computer server port
-                    await this.reversePort(8080, serverPort, deviceId);
+                    await this.reversePort(deviceId, 8080, serverPort);
                     
                     // Verify the forwarding was successful
                     const verification = await this.verifyPortForwarding(deviceId, 8080);
@@ -205,7 +216,7 @@ class AdbManager {
     async verifyPortForwarding(deviceId = null, port) {
         try {
             const deviceArg = deviceId ? `-s ${deviceId}` : '';
-            const command = `${this.adbPath} ${deviceArg} reverse --list`;
+            const command = `"${this.adbPath}" ${deviceArg} reverse --list`;
             
             return new Promise((resolve) => {
                 exec(command, (error, stdout, stderr) => {
@@ -228,9 +239,9 @@ class AdbManager {
     async performHealthCheck(deviceId = null) {
         try {
             // Check device connectivity
-            const devices = await this.listDevices();
+            const devices = await this.getDevices();
             const targetDevice = deviceId ? 
-                devices.find(d => d.id === deviceId) : 
+                devices.find(d => d.serial === deviceId) : 
                 devices.find(d => d.connected);
             
             if (!targetDevice || !targetDevice.connected) {
@@ -277,7 +288,7 @@ class AdbManager {
     async getDeviceInfo(deviceId = null) {
         return new Promise((resolve, reject) => {
             const deviceArg = deviceId ? `-s ${deviceId}` : '';
-            const command = `${this.adbPath} ${deviceArg} shell getprop ro.product.model`;
+            const command = `"${this.adbPath}" ${deviceArg} shell getprop ro.product.model`;
             
             exec(command, (error, stdout, stderr) => {
                 if (error) {
@@ -296,7 +307,7 @@ class AdbManager {
         // Monitor device connection status
         const checkDevices = async () => {
             try {
-                const devices = await this.listDevices();
+                const devices = await this.getDevices();
                 callback(devices);
             } catch (error) {
                 console.error('Error checking devices:', error);

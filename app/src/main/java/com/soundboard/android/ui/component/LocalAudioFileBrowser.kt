@@ -27,6 +27,7 @@ import androidx.compose.ui.window.Dialog
 import com.soundboard.android.network.api.AudioFile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
@@ -66,21 +67,24 @@ fun LocalAudioFileBrowser(
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                // Convert URI to file path and create AudioFile
                 try {
-                    val path = uri.path ?: return@let
+                    // Take persistent permissions to access the file across device reboots
+                    val contentResolver = context.contentResolver
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
                     val fileName = uri.lastPathSegment ?: "audio_file"
                     
                     val audioFile = AudioFile(
                         name = fileName,
-                        path = path,
+                        path = uri.toString(), // Store the URI itself as the path for persistent access
                         format = fileName.substringAfterLast('.', ""),
-                        size = 0, // Size will be determined later
+                        size = 0,
                         uri = uri.toString()
                     )
                     onFileSelected(audioFile)
                 } catch (e: Exception) {
-                    // Handle error silently
+                    // Log the error properly instead of failing silently
+                    Log.e("LocalAudioFileBrowser", "Error processing selected file: ${uri}", e)
                 }
             }
         }
@@ -114,7 +118,8 @@ fun LocalAudioFileBrowser(
                     currentPath = currentDirectoryPath,
                     onSystemFilePicker = {
                         // Launch system file picker for audio files
-                        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        // Use ACTION_OPEN_DOCUMENT for persistent permissions
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                             type = "audio/*"
                             addCategory(Intent.CATEGORY_OPENABLE)
                         }

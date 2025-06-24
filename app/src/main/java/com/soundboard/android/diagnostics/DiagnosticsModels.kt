@@ -25,7 +25,13 @@ enum class ComponentType {
     @SerialName("pipeline") PIPELINE,
     @SerialName("metrics") METRICS,
     @SerialName("network") NETWORK,
-    @SerialName("system") SYSTEM
+    @SerialName("system") SYSTEM,
+    @SerialName("ui_main") UI_MAIN,
+    @SerialName("ui_settings") UI_SETTINGS,
+    @SerialName("ui_dialog") UI_DIALOG,
+    @SerialName("ui_layout") UI_LAYOUT,
+    @SerialName("ui_soundboard") UI_SOUNDBOARD,
+    @SerialName("ui_monitoring") UI_MONITORING
 }
 
 /**

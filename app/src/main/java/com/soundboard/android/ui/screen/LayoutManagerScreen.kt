@@ -26,6 +26,8 @@ import com.soundboard.android.data.model.*
 import com.soundboard.android.ui.component.*
 import com.soundboard.android.ui.theme.*
 import com.soundboard.android.ui.viewmodel.SoundboardViewModel
+import com.soundboard.android.ui.viewmodel.logInteraction
+import com.soundboard.android.diagnostics.ComponentType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +97,10 @@ fun LayoutManagerScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 IconButton(
-                    onClick = { showTemplateDialog = true },
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Templates", ComponentType.UI_LAYOUT)
+                        showTemplateDialog = true
+                    },
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
@@ -110,7 +115,10 @@ fun LayoutManagerScreen(
                 }
                 
                 IconButton(
-                    onClick = { showCreateDialog = true },
+                    onClick = {
+                        viewModel.logInteraction("Clicked on Create Layout", ComponentType.UI_LAYOUT)
+                        showCreateDialog = true
+                    },
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(10.dp))
@@ -203,8 +211,14 @@ fun LayoutManagerScreen(
     
     // Dialogs
     if (showCreateDialog) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Create Layout Dialog", ComponentType.UI_DIALOG)
+        }
         CreateLayoutDialog(
-            onDismiss = { showCreateDialog = false },
+            onDismiss = {
+                viewModel.logInteraction("Create Layout Dialog dismissed", ComponentType.UI_DIALOG)
+                showCreateDialog = false
+            },
             onCreate = { name, preset ->
                 viewModel.createLayout(name, preset)
                 showCreateDialog = false
@@ -213,19 +227,29 @@ fun LayoutManagerScreen(
     }
     
     if (showTemplateDialog) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Template Dialog", ComponentType.UI_DIALOG)
+        }
         TemplateDialog(
-            onDismiss = { showTemplateDialog = false },
+            onDismiss = {
+                viewModel.logInteraction("Template Dialog dismissed", ComponentType.UI_DIALOG)
+                showTemplateDialog = false
+            },
             onSelectTemplate = { template ->
-                /* TODO: viewModel.createLayoutFromTemplate(template) */
+                viewModel.createLayoutFromTemplate(template.name, template)
                 showTemplateDialog = false
             }
         )
     }
     
     if (showEditDialog && selectedLayoutForEdit != null) {
+        LaunchedEffect(Unit) {
+            viewModel.logInteraction("Showing Edit Layout Dialog", ComponentType.UI_DIALOG)
+        }
         EditLayoutDialog(
             layout = selectedLayoutForEdit!!,
             onDismiss = {
+                viewModel.logInteraction("Edit Layout Dialog dismissed", ComponentType.UI_DIALOG)
                 showEditDialog = false
                 selectedLayoutForEdit = null
             },

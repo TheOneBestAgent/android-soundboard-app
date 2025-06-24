@@ -1,8 +1,11 @@
+const path = require('path');
+// Load environment variables from .env file
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 const fs = require('fs-extra');
 const AudioPlayer = require('./audio/AudioPlayer');
 const VoicemeeterManager = require('./audio/VoicemeeterManager');
@@ -12,6 +15,7 @@ const SmartReconnectionManager = require('./network/SmartReconnectionManager');
 const NetworkDiscoveryService = require('./network/NetworkDiscoveryService');
 const USBAutoDetectionService = require('./network/USBAutoDetectionService');
 const { Server } = require('socket.io');
+const ConnectionAnalytics = require('./network/ConnectionAnalytics');
 
 class SoundboardServer {
     constructor() {
@@ -50,7 +54,6 @@ class SoundboardServer {
         
         this.audioPlayer = new AudioPlayer();
         this.voicemeeterManager = new VoicemeeterManager(this.audioPlayer);
-        this.adbManager = new AdbManager();
         this.connectedClients = new Map();
         this.audioFiles = new Map(); // Store audio file metadata
         
@@ -59,8 +62,9 @@ class SoundboardServer {
         this.reconnectionManager = new SmartReconnectionManager();
         
         // Phase 2: Discovery & Automation services
+        // The USB service now creates its own AdbManager with the correct path
+        this.usbAutoDetection = new USBAutoDetectionService();
         this.networkDiscovery = new NetworkDiscoveryService(this.port, 'Soundboard Server');
-        this.usbAutoDetection = new USBAutoDetectionService(this.adbManager, this.port);
         
         // Phase 3: Enhanced Connection Analytics
         this.startTime = Date.now();
@@ -86,6 +90,9 @@ class SoundboardServer {
         this.setupRoutes();
         this.setupSocketHandlers();
         this.setupAudioDirectory();
+        
+        this.voicemeeterManager.initializeVoicemeeter();
+        this.usbAutoDetection.startMonitoring();
     }
     
     setupEnhancedMonitoring() {
@@ -228,7 +235,7 @@ class SoundboardServer {
                 connections: {
                     total: globalAnalytics.totalConnections,
                     active: globalAnalytics.activeConnections,
-                    history: globalAnalytics.connectionHistory.slice(-10) // Last 10 connections
+                    history: this.connectionStats.connectionHistory.slice(-10) // Last 10 connections
                 },
                 server: {
                     memory: process.memoryUsage(),
@@ -809,98 +816,46 @@ class SoundboardServer {
     }
     
     async start(port = 3001) {
-        // Initialize ADB
-        console.log('🔌 Initializing ADB connection...');
-        const adbAvailable = await this.adbManager.checkAdbAvailable();
-        
-        if (adbAvailable) {
-            console.log('✅ ADB is available');
-            
-            // Track properly forwarded devices to prevent spam
-            const forwardedDevices = new Set();
-            let lastDeviceState = '';
-            
-            // Start device monitoring
-            this.adbManager.startDeviceMonitoring((devices) => {
-                // Create a hash of current device state to detect changes
-                const currentState = devices.map(d => `${d.id}:${d.status}`).sort().join(',');
-                
-                // Only process if device state actually changed
-                if (currentState !== lastDeviceState) {
-                    lastDeviceState = currentState;
-                    
-                    const connectedDevices = devices.filter(d => d.connected);
-                    console.log('📱 Connected devices:', connectedDevices);
-                    
-                    // Setup port forwarding for newly connected devices only
-                    connectedDevices.forEach(async (device) => {
-                        if (!forwardedDevices.has(device.id)) {
-                            try {
-                                const success = await this.adbManager.setupSoundboardForwarding(device.id, port);
-                                if (success) {
-                                    console.log(`🔗 Port forwarding established for ${device.id}`);
-                                    forwardedDevices.add(device.id);
-                                }
-                            } catch (err) {
-                                // Only log non-duplicate errors
-                                if (!err.message.includes('Address already in use')) {
-                                    console.error('❌ Port forwarding error:', err.message);
-                                }
-                            }
-                        }
-                    });
-                    
-                    // Remove disconnected devices from tracking
-                    const connectedIds = new Set(connectedDevices.map(d => d.id));
-                    forwardedDevices.forEach(deviceId => {
-                        if (!connectedIds.has(deviceId)) {
-                            console.log(`📱 Device disconnected: ${deviceId}`);
-                            forwardedDevices.delete(deviceId);
-                        }
-                    });
-                }
-                
-                // Emit device status to all connected clients (only on changes)
-                if (currentState !== lastDeviceState) {
-                    this.io.emit('device_status', {
-                        devices,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            });
+        this.port = port || process.env.PORT;
+
+        try {
+            // Check for ADB availability via the USB service's manager
+            const adbAvailable = await this.usbAutoDetection.adbManager.checkAdbAvailable();
+            if (adbAvailable) {
+                console.log('✅ ADB is available.');
         } else {
-            console.log('❌ ADB not available - USB connection will not work');
-            console.log('💡 Make sure Android SDK platform-tools are installed and in PATH');
+                console.warn('⚠️ ADB not found. USB features will be disabled.');
+        }
+        } catch (error) {
+            console.error('❌ Error checking for ADB:', error.message);
         }
 
-        // Handle port conflicts gracefully
-        this.server.on('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
-                console.error(`❌ Port ${port} is already in use!`);
-                console.log(`💡 To fix this, run: lsof -ti:${port} | xargs kill -9`);
-                console.log(`💡 Then restart the server with: npm start`);
-                process.exit(1);
-            } else {
-                console.error('❌ Server error:', err);
-                process.exit(1);
-            }
-        });
-
-        this.server.listen(port, '127.0.0.1', () => {
+        this.server.listen(this.port, () => {
+            console.log(`\n============================================================`);
+            console.log('🎵 Soundboard Server Started (Network Mode)');
             console.log('='.repeat(60));
-            console.log('🎵 Soundboard Server Started (USB Mode)');
-            console.log('='.repeat(60));
-            console.log(`Server running on port ${port}`);
+            console.log(`Server running on port ${this.port}`);
             console.log(`Computer: ${require('os').hostname()}`);
             console.log(`Platform: ${process.platform}`);
-            console.log(`Connection: USB Cable with ADB Port Forwarding`);
+            console.log(`Connection: Network & USB with ADB Port Forwarding`);
             console.log('');
             console.log('Endpoints:');
-            console.log(`  Health Check: http://localhost:${port}/health`);
-            console.log(`  Server Info:  http://localhost:${port}/info`);
-            console.log(`  Audio Files:  http://localhost:${port}/audio-files`);
-            console.log(`  ADB Status:   http://localhost:${port}/adb/status`);
-            console.log(`  ADB Devices:  http://localhost:${port}/adb/devices`);
+            console.log(`  Health Check: http://localhost:${this.port}/health`);
+            console.log(`  Server Info:  http://localhost:${this.port}/info`);
+            console.log(`  Audio Files:  http://localhost:${this.port}/audio-files`);
+            console.log(`  ADB Status:   http://localhost:${this.port}/adb/status`);
+            console.log(`  ADB Devices:  http://localhost:${this.port}/adb/devices`);
+            console.log('');
+            console.log('Network Access:');
+            const os = require('os');
+            const interfaces = os.networkInterfaces();
+            Object.keys(interfaces).forEach(name => {
+                interfaces[name].forEach(iface => {
+                    if (iface.family === 'IPv4' && !iface.internal) {
+                        console.log(`  ${name}: http://${iface.address}:${this.port}`);
+                    }
+                });
+            });
             console.log('');
             console.log('Setup Instructions:');
             console.log('1. Enable Developer Options on your Android device');

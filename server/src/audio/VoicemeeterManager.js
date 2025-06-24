@@ -1,124 +1,112 @@
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs-extra');
+const EventEmitter = require('events');
 const os = require('os');
+const path = require('path');
+const { Voicemeeter } = require('voicemeeter-connector');
 
-class VoicemeeterManager {
+/**
+ * Manages all interactions with the Voicemeeter Remote API.
+ * This class handles initialization, connection, and audio playback routing.
+ * It now uses the 'voicemeeter-connector' library for improved stability and API access.
+ */
+class VoicemeeterManager extends EventEmitter {
     constructor(audioPlayer) {
-        this.platform = process.platform;
-        this.audioPlayer = audioPlayer; // Fallback to direct audio playback
+        super();
+        this.audioPlayer = audioPlayer;
         this.voicemeeter = null;
         this.isConnected = false;
         this.isAvailable = false;
+        this.platform = os.platform();
         
-        console.log(`🎛️ VoicemeeterManager initialized for platform: ${this.platform}`);
-        
-        // Only try to initialize Voicemeeter on Windows
         if (this.platform === 'win32') {
+            console.log('🎛️ VoicemeeterManager initialized for platform: win32');
             this.initializeVoicemeeter();
-        } else {
-            console.log(`⚠️ Voicemeeter is only available on Windows. Using direct audio playback on ${this.platform}.`);
         }
     }
-    
-    async initializeVoicemeeter() {
-        try {
-            // Dynamic import for Windows-only dependency
-            const voicemeeterRemote = require('voicemeeter-remote');
-            
-            console.log('🔌 Initializing Voicemeeter Remote API...');
-            
-            await voicemeeterRemote.init();
-            this.voicemeeter = voicemeeterRemote;
+
+    /**
+     * Initializes the Voicemeeter API using the 'voicemeeter-connector' library.
+     */
+    initializeVoicemeeter() {
+        console.log('🔌 Initializing Voicemeeter Connector API...');
+        Voicemeeter.init().then(vm => {
+            this.voicemeeter = vm;
             this.isAvailable = true;
-            
-            console.log('✅ Voicemeeter Remote API initialized successfully');
-            
-            // Try to connect
-            await this.connect();
-            
-        } catch (error) {
-            console.warn('⚠️ Failed to initialize Voicemeeter Remote API:', error.message);
-            console.log('📢 Using direct audio playback as fallback');
+            console.log('✅ Voicemeeter Connector initialized successfully.');
+            this.connect();
+        }).catch(err => {
+            console.warn('⚠️ Voicemeeter installation not found or failed to initialize with voicemeeter-connector.', err.message);
             this.isAvailable = false;
-        }
-    }
-    
-    async connect() {
-        if (!this.isAvailable || this.isConnected) {
-            return false;
-        }
-        
-        try {
-            console.log('🔗 Connecting to Voicemeeter...');
-            this.voicemeeter.login();
-            this.isConnected = true;
-            
-            console.log('✅ Connected to Voicemeeter successfully');
-            
-            // Log Voicemeeter version and type
-            const version = this.voicemeeter.getVoicemeeterVersion();
-            const type = this.voicemeeter.getVoicemeeterType();
-            console.log(`🎛️ Voicemeeter Type: ${type}, Version: ${version}`);
-            
-            return true;
-        } catch (error) {
-            console.error('❌ Failed to connect to Voicemeeter:', error.message);
             this.isConnected = false;
-            return false;
-        }
+        });
     }
     
-    async disconnect() {
-        if (!this.isAvailable || !this.isConnected) {
+    /**
+     * Connects to the Voicemeeter client application.
+     */
+    connect() {
+        if (!this.isAvailable || this.isConnected) {
             return;
         }
         
         try {
-            console.log('🔌 Disconnecting from Voicemeeter...');
-            this.voicemeeter.logout();
-            this.isConnected = false;
-            console.log('✅ Disconnected from Voicemeeter');
+            console.log('🔗 Connecting to Voicemeeter...');
+            this.voicemeeter.connect();
+            this.isConnected = true;
+            const type = this.voicemeeter.$type;
+            const version = this.voicemeeter.$version;
+            console.log(`✅ Connected to Voicemeeter successfully`);
+            console.log(`🎛️ Voicemeeter Type: ${type}, Version: ${version}`);
+            this.emit('connected', { type, version });
         } catch (error) {
-            console.error('❌ Error disconnecting from Voicemeeter:', error.message);
+            console.error('❌ Failed to connect to Voicemeeter:', error);
+            this.isConnected = false;
+            this.emit('error', error);
         }
     }
     
-    async playSound(filePath, volume = 1.0, buttonId = null, options = {}) {
-        try {
-            const fileName = require('path').basename(filePath);
-            console.log(`🎵 VoicemeeterManager: Playing ${fileName} (original volume: ${volume})`);
-            
-            // Apply volume normalization if enabled
-            const normalizedVolume = options.enableNormalization !== false ? 
-                this.normalizeVolume(volume, fileName) : volume;
-            
-            if (normalizedVolume !== volume) {
-                console.log(`🎚️ Volume adjusted: ${(volume * 100).toFixed(0)}% -> ${(normalizedVolume * 100).toFixed(0)}%`);
-            }
+    /**
+     * Disconnects from the Voicemeeter client application.
+     */
+    disconnect() {
+        if (this.isConnected) {
+            this.voicemeeter.disconnect();
+            this.isConnected = false;
+            console.log('🔌 Disconnected from Voicemeeter.');
+            this.emit('disconnected');
+        }
+    }
+
+    /**
+     * Plays a sound file using the most appropriate Voicemeeter method.
+     * Prefers using the 'Recorder' for direct playback. Falls back to controlling
+     * a virtual input strip if the recorder is unavailable.
+     */
+    async playSound(filePath, volume, buttonId, options = {}) {
+        const { fileName } = options;
+        console.log(`🎵 VoicemeeterManager: Playing ${fileName || path.basename(filePath)} (original volume: ${volume})`);
+        const normalizedVolume = Math.max(0, Math.min(1, volume));
             
             if (this.isAvailable && this.isConnected) {
-                return await this.playViaVoicemeeter(filePath, normalizedVolume, buttonId, {
-                    ...options,
-                    originalVolume: volume,
-                    normalizedVolume: normalizedVolume,
-                    fileName: fileName
-                });
-            } else {
-                console.log('🔄 Voicemeeter not available, using direct audio playback');
-                return await this.audioPlayer.playSound(filePath, normalizedVolume);
+            try {
+                // Use the 'setOption' method from the new library to execute a script
+                const script = `Recorder.load = "${filePath.replace(/\\/g, '\\\\')}"; recorder.play = 1;`;
+                console.log(`📼 Executing Voicemeeter script:\n${script}`);
+                await this.voicemeeter.setOption(script);
+                return true;
+            } catch (error) {
+                console.error('❌ Failed to play sound via Voicemeeter script:', error);
+                console.warn('⚠️ Voicemeeter recorder API not available. Falling back to strip gain control.');
+                return await this.playViaVoicemeeterFallback(filePath, normalizedVolume, buttonId, options);
             }
-        } catch (error) {
-            console.error('❌ Error in VoicemeeterManager.playSound:', error);
-            // Fallback to direct audio playback
-            console.log('🔄 Falling back to direct audio playback');
-            return await this.audioPlayer.playSound(filePath, volume);
+        } else {
+            console.log('🔄 Voicemeeter not available, using direct audio playback.');
+            return await this.audioPlayer.playSound(filePath, normalizedVolume, buttonId);
         }
     }
     
-    async playViaVoicemeeter(filePath, volume, buttonId, options) {
+    async playViaVoicemeeterFallback(filePath, volume, buttonId, options) {
         try {
-            console.log(`🎛️ Playing via Voicemeeter: ${filePath} (Volume: ${(volume * 100).toFixed(0)}%)`);
+            console.log(`🎛️ Playing via Voicemeeter (Fallback): ${filePath} (Volume: ${(volume * 100).toFixed(0)}%)`);
             
             // Enhanced volume handling for Voicemeeter integration
             const normalizedVolume = Math.max(0, Math.min(1, volume));
@@ -126,36 +114,8 @@ class VoicemeeterManager {
             
             console.log(`🔊 Volume settings: Linear=${normalizedVolume.toFixed(2)}, dB=${volumeDb.toFixed(1)}dB`);
             
-            // Option 1: Try to use cassette player with enhanced volume control
-            if (this.voicemeeter.setCassetteFile) {
-                console.log('📼 Loading file into Voicemeeter cassette player...');
-                
-                // Stop any currently playing cassette
-                try {
-                    await this.voicemeeter.setCassettePlay(false);
-                    await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
-                } catch (e) {
-                    // Ignore if cassette wasn't playing
-                }
-                
-                // Load new file and set volume
-                await this.voicemeeter.setCassetteFile(filePath);
-                
-                // Set cassette volume before playing
-                if (this.voicemeeter.setCassetteGain) {
-                    await this.voicemeeter.setCassetteGain(volumeDb);
-                    console.log(`🎚️ Cassette gain set to ${volumeDb.toFixed(1)}dB`);
-                }
-                
-                // Start playback
-                await this.voicemeeter.setCassettePlay(true);
-                
-                console.log('✅ Audio playing via Voicemeeter cassette player with volume control');
-                return true;
-            }
-            
-            // Option 2: Route through virtual input with dynamic strip control
-            console.log('🔄 Cassette player not available, using virtual input routing with strip control...');
+            // Route through virtual input with dynamic strip control
+            console.log('🔄 Using virtual input routing with strip control...');
             
             // Try to set volume on a designated strip (e.g., Strip 0 for soundboard)
             const soundboardStripIndex = options.stripIndex || 0;
@@ -296,8 +256,8 @@ class VoicemeeterManager {
             platform: this.platform,
             available: this.isAvailable,
             connected: this.isConnected,
-            version: this.isConnected && this.voicemeeter ? this.voicemeeter.getVoicemeeterVersion() : null,
-            type: this.isConnected && this.voicemeeter ? this.voicemeeter.getVoicemeeterType() : null
+            version: this.isConnected && this.voicemeeter ? this.voicemeeter.$version : null,
+            type: this.isConnected && this.voicemeeter ? this.voicemeeter.$type : null
         };
     }
     
@@ -308,4 +268,5 @@ class VoicemeeterManager {
     }
 }
 
+module.exports = VoicemeeterManager; 
 module.exports = VoicemeeterManager; 

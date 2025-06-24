@@ -34,17 +34,51 @@
 
 ## Development Setup
 
+### Cross-Platform Development Environment
+- **Supported Platforms:** Windows, macOS, Linux
+- **Automated Setup:** `npm run setup` - detects platform and configures environment
+- **Configuration Files:** 
+  - `platform-config.json` - platform-specific paths and settings
+  - `scripts/setup-environment.js` - automated environment detection and setup
+  - `local.properties` - auto-generated SDK/JDK paths
+  - `server/.env` - auto-generated server environment with ADB path
+
 ### Android Development Environment
 - **IDE:** Android Studio Flamingo or later
 - **Build System:** Gradle 8.14.2+
 - **Java Version:** JDK 17
 - **Gradle Plugin:** Android Gradle Plugin 8.10.1+
+- **Cross-Platform Build Scripts:**
+  - Windows: `gradlew.bat clean assembleDebug`
+  - macOS/Linux: `./gradlew clean assembleDebug`
+  - Universal: `npm run build` (auto-detects platform)
 
 ### Computer Server Development
 - **IDE:** VS Code or IntelliJ IDEA
 - **Package Manager:** npm or yarn
 - **Testing:** Jest for unit tests
 - **Build:** Webpack for production builds
+- **ADB Integration:** Cross-platform ADB path resolution for USB device detection
+
+### Platform-Specific Configurations
+
+#### Windows
+- **SDK Path:** `%LOCALAPPDATA%\Android\Sdk`
+- **JDK Path:** `%USERPROFILE%\.jdks` or `%JAVA_HOME%`
+- **ADB Path:** `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`
+- **Build Wrapper:** `gradlew.bat`
+
+#### macOS
+- **SDK Path:** `~/Library/Android/sdk`
+- **JDK Path:** `/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home`
+- **ADB Path:** `~/Library/Android/sdk/platform-tools/adb`
+- **Build Wrapper:** `./gradlew`
+
+#### Linux
+- **SDK Path:** `~/Android/Sdk`
+- **JDK Path:** `/usr/lib/jvm/java-17-openjdk`
+- **ADB Path:** `~/Android/Sdk/platform-tools/adb`
+- **Build Wrapper:** `./gradlew`
 
 ## Dependencies & Constraints
 

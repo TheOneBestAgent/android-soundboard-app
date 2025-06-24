@@ -1,0 +1,341 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { execSync, spawn } = require('child_process');
+
+class CrossPlatformSetup {
+    constructor() {
+        this.platform = this.detectPlatform();
+        this.projectRoot = path.resolve(__dirname, '..');
+        this.config = this.loadPlatformConfig();
+        
+        console.log(`🔧 Setting up environment for ${this.platform}`);
+    }
+    
+    detectPlatform() {
+        const platform = os.platform();
+        switch (platform) {
+            case 'win32': return 'windows';
+            case 'darwin': return 'darwin';
+            case 'linux': return 'linux';
+            default: 
+                console.warn(`⚠️ Unknown platform: ${platform}, defaulting to linux`);
+                return 'linux';
+        }
+    }
+    
+    loadPlatformConfig() {
+        const configPath = path.join(this.projectRoot, 'platform-config.json');
+        try {
+            const configData = fs.readFileSync(configPath, 'utf8');
+            return JSON.parse(configData);
+        } catch (error) {
+            console.error('❌ Failed to load platform configuration:', error.message);
+            process.exit(1);
+        }
+    }
+    
+    expandPath(pathTemplate) {
+        if (this.platform === 'windows') {
+            // Expand Windows environment variables
+            return pathTemplate
+                .replace(/%LOCALAPPDATA%/g, process.env.LOCALAPPDATA || '')
+                .replace(/%USERPROFILE%/g, process.env.USERPROFILE || '')
+                .replace(/%USERNAME%/g, process.env.USERNAME || '')
+                .replace(/%JAVA_HOME%/g, process.env.JAVA_HOME || '');
+        } else {
+            // Expand Unix environment variables
+            return pathTemplate
+                .replace(/\$HOME/g, os.homedir())
+                .replace(/\$JAVA_HOME/g, process.env.JAVA_HOME || '')
+                .replace(/\$\{([^}]+)\}/g, (match, varName) => process.env[varName] || '');
+        }
+    }
+    
+    findValidPath(pathTemplates) {
+        for (const template of pathTemplates) {
+            const expandedPath = this.expandPath(template);
+            if (fs.existsSync(expandedPath)) {
+                return expandedPath;
+            }
+        }
+        return null;
+    }
+    
+    async setupAndroidSDK() {
+        console.log('📱 Setting up Android SDK...');
+        
+        const platformConfig = this.config.platforms[this.platform];
+        const sdkPath = this.findValidPath(platformConfig.sdk.defaultPaths);
+        
+        if (!sdkPath) {
+            console.error('❌ Android SDK not found. Please install Android Studio or SDK Command Line Tools.');
+            console.log('📋 Recommended paths:');
+            platformConfig.sdk.defaultPaths.forEach(path => {
+                console.log(`   - ${this.expandPath(path)}`);
+            });
+            return false;
+        }
+        
+        console.log(`✅ Found Android SDK: ${sdkPath}`);
+        return sdkPath;
+    }
+    
+    async setupJDK() {
+        console.log('☕ Setting up JDK...');
+        
+        const platformConfig = this.config.platforms[this.platform];
+        const jdkPath = this.findValidPath(platformConfig.jdk.defaultPaths);
+        
+        if (!jdkPath) {
+            console.error('❌ JDK 17 not found. Please install OpenJDK 17.');
+            console.log('📋 Recommended paths:');
+            platformConfig.jdk.defaultPaths.forEach(path => {
+                console.log(`   - ${this.expandPath(path)}`);
+            });
+            return false;
+        }
+        
+        console.log(`✅ Found JDK: ${jdkPath}`);
+        return jdkPath;
+    }
+    
+    async setupADB() {
+        console.log('🔌 Setting up ADB (Android Debug Bridge)...');
+        
+        const platformConfig = this.config.platforms[this.platform];
+        const adbPath = this.findValidPath(platformConfig.adb.defaultPaths);
+        
+        if (!adbPath) {
+            console.error('❌ ADB not found. Please install Android SDK Platform Tools.');
+            console.log('📋 Expected paths:');
+            platformConfig.adb.defaultPaths.forEach(path => {
+                console.log(`   - ${this.expandPath(path)}`);
+            });
+            return false;
+        }
+        
+        console.log(`✅ Found ADB: ${adbPath}`);
+        
+        // Test ADB functionality
+        try {
+            const result = execSync(`"${adbPath}" version`, { encoding: 'utf8' });
+            console.log(`📱 ADB Version: ${result.split('\n')[0]}`);
+        } catch (error) {
+            console.warn('⚠️ ADB test failed:', error.message);
+        }
+        
+        return adbPath;
+    }
+    
+    async createLocalProperties(sdkPath, jdkPath) {
+        console.log('📝 Creating local.properties...');
+        
+        const localPropsPath = path.join(this.projectRoot, 'local.properties');
+        const content = `# Auto-generated by setup-environment.js
+# Platform: ${this.platform}
+# Generated: ${new Date().toISOString()}
+
+sdk.dir=${sdkPath.replace(/\\/g, '/')}
+java.home=${jdkPath.replace(/\\/g, '/')}
+`;
+        
+        try {
+            fs.writeFileSync(localPropsPath, content, 'utf8');
+            console.log('✅ local.properties created successfully');
+        } catch (error) {
+            console.error('❌ Failed to create local.properties:', error.message);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    async setupServerEnvironment(adbPath) {
+        console.log('🖥️ Setting up server environment...');
+        
+        const serverEnvPath = path.join(this.projectRoot, 'server', '.env');
+        const content = `# Auto-generated by setup-environment.js
+# Platform: ${this.platform}
+# Generated: ${new Date().toISOString()}
+
+ADB_PATH=${adbPath}
+PLATFORM=${this.platform}
+NODE_ENV=development
+`;
+        
+        try {
+            fs.writeFileSync(serverEnvPath, content, 'utf8');
+            console.log('✅ Server .env file created successfully');
+        } catch (error) {
+            console.error('❌ Failed to create server .env file:', error.message);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    async installDependencies() {
+        console.log('📦 Installing server dependencies...');
+        
+        try {
+            const serverDir = path.join(this.projectRoot, 'server');
+            process.chdir(serverDir);
+            
+            console.log('🔄 Running npm install...');
+            execSync('npm install', { stdio: 'inherit' });
+            
+            console.log('✅ Server dependencies installed');
+            return true;
+        } catch (error) {
+            console.error('❌ Failed to install dependencies:', error.message);
+            return false;
+        } finally {
+            process.chdir(this.projectRoot);
+        }
+    }
+    
+    async validateGradleSetup() {
+        console.log('🐘 Validating Gradle setup...');
+        
+        const platformConfig = this.config.platforms[this.platform];
+        const gradleWrapper = path.join(this.projectRoot, platformConfig.gradle.wrapper);
+        
+        if (!fs.existsSync(gradleWrapper)) {
+            console.error(`❌ Gradle wrapper not found: ${gradleWrapper}`);
+            return false;
+        }
+        
+        try {
+            console.log('🔄 Testing Gradle wrapper...');
+            const result = execSync(`"${gradleWrapper}" --version`, { 
+                encoding: 'utf8',
+                cwd: this.projectRoot 
+            });
+            console.log(`✅ Gradle version: ${result.split('\n')[2]}`);
+            return true;
+        } catch (error) {
+            console.error('❌ Gradle test failed:', error.message);
+            return false;
+        }
+    }
+    
+    async createPlatformScripts() {
+        console.log('📜 Creating platform-specific scripts...');
+        
+        const scriptsDir = path.join(this.projectRoot, 'scripts');
+        if (!fs.existsSync(scriptsDir)) {
+            fs.mkdirSync(scriptsDir, { recursive: true });
+        }
+        
+        // Create build script
+        const buildScript = this.platform === 'windows' ? 
+            this.createWindowsBuildScript() : 
+            this.createUnixBuildScript();
+        
+        const buildScriptPath = path.join(scriptsDir, 
+            this.platform === 'windows' ? 'build.bat' : 'build.sh');
+        
+        fs.writeFileSync(buildScriptPath, buildScript, 'utf8');
+        
+        if (this.platform !== 'windows') {
+            fs.chmodSync(buildScriptPath, '755');
+        }
+        
+        console.log(`✅ Build script created: ${buildScriptPath}`);
+        return true;
+    }
+    
+    createWindowsBuildScript() {
+        return `@echo off
+REM Auto-generated Windows build script
+echo 🔨 Building Android Soundboard App (Windows)
+
+REM Clean previous build
+echo 🧹 Cleaning previous build...
+call gradlew.bat clean
+
+REM Build debug APK
+echo 📱 Building debug APK...
+call gradlew.bat assembleDebug
+
+REM Check if build was successful
+if exist "app\\build\\outputs\\apk\\debug\\app-debug.apk" (
+    echo ✅ Build successful!
+    echo 📱 APK location: app\\build\\outputs\\apk\\debug\\app-debug.apk
+) else (
+    echo ❌ Build failed!
+    exit /b 1
+)
+
+pause
+`;
+    }
+    
+    createUnixBuildScript() {
+        return `#!/bin/bash
+# Auto-generated Unix build script
+echo "🔨 Building Android Soundboard App (${this.platform})"
+
+# Clean previous build
+echo "🧹 Cleaning previous build..."
+./gradlew clean
+
+# Build debug APK
+echo "📱 Building debug APK..."
+./gradlew assembleDebug
+
+# Check if build was successful
+if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+    echo "✅ Build successful!"
+    echo "📱 APK location: app/build/outputs/apk/debug/app-debug.apk"
+else
+    echo "❌ Build failed!"
+    exit 1
+fi
+`;
+    }
+    
+    async run() {
+        console.log('🚀 Starting cross-platform environment setup...\n');
+        
+        const sdkPath = await this.setupAndroidSDK();
+        if (!sdkPath) return false;
+        
+        const jdkPath = await this.setupJDK();
+        if (!jdkPath) return false;
+        
+        const adbPath = await this.setupADB();
+        if (!adbPath) return false;
+        
+        await this.createLocalProperties(sdkPath, jdkPath);
+        await this.setupServerEnvironment(adbPath);
+        await this.installDependencies();
+        await this.validateGradleSetup();
+        await this.createPlatformScripts();
+        
+        console.log('\n🎉 Environment setup completed successfully!');
+        console.log('\n📋 Next steps:');
+        console.log('   1. Run the server: cd server && npm start');
+        console.log('   2. Build the app: npm run build (or use platform-specific script)');
+        console.log('   3. Connect your Android device via USB');
+        console.log('   4. Enable USB Debugging in Developer Options');
+        
+        return true;
+    }
+}
+
+// Run the setup if this script is executed directly
+if (require.main === module) {
+    const setup = new CrossPlatformSetup();
+    setup.run().then(success => {
+        process.exit(success ? 0 : 1);
+    }).catch(error => {
+        console.error('💥 Setup failed:', error);
+        process.exit(1);
+    });
+}
+
+module.exports = CrossPlatformSetup; 
