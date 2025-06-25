@@ -614,11 +614,12 @@ class DiagnosticsManager @Inject constructor(
     private suspend fun monitorUIHealth(): ComponentHealth {
         // Placeholder for UI health monitoring
         return ComponentHealth(
-            name = "UI",
-            status = HealthStatus.HEALTHY,
+            component = ComponentType.UI_MAIN,
             score = 0.95,
-            message = "UI components are responsive",
-            recommendations = emptyList()
+            metrics = mapOf(
+                "responsiveness" to 0.95,
+                "render_time" to 16.0
+            )
         )
     }
 

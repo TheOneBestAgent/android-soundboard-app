@@ -293,8 +293,9 @@ fun SettingsScreen(
             onStartDiscovery = {
                 networkDiscoveryService.startDiscovery()
             },
-            onStopDiscovery = {
+            onRefreshDiscovery = {
                 networkDiscoveryService.stopDiscovery()
+                networkDiscoveryService.startDiscovery()
             }
         )
     }
@@ -325,10 +326,9 @@ fun SettingsScreen(
                 viewModel.logInteraction("MyInstantDownloader dismissed", ComponentType.UI_DIALOG)
                 showMyInstantDownloader = false
             },
-            onDownload = { audioFile ->
-                // Pass to viewModel for handling
-                viewModel.downloadMyInstantSound(audioFile)
-                snackbarMessage = "Downloading ${audioFile.name}..."
+            onDownloadComplete = { fileName, filePath ->
+                // Handle download completion
+                snackbarMessage = "Downloaded $fileName"
             }
         )
     }
@@ -342,7 +342,12 @@ fun SettingsScreen(
                 viewModel.logInteraction("Appearance Settings Dialog dismissed", ComponentType.UI_DIALOG)
                 showAppearanceSettings = false
             },
-            settingsRepository = settingsRepository
+            currentTheme = "default",
+            currentAccentColor = "blue",
+            isDarkTheme = false,
+            onThemeChange = { /* TODO: Implement theme change */ },
+            onAccentColorChange = { /* TODO: Implement accent color change */ },
+            onDarkThemeToggle = { /* TODO: Implement dark theme toggle */ }
         )
     }
     

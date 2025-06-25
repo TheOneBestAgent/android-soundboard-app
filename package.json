@@ -6,13 +6,18 @@
   "scripts": {
     "setup": "node scripts/setup-environment.js",
     "build": "npm run setup && npm run build:android",
-    "build:android": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(`${wrapper} clean assembleDebug`, {stdio:'inherit'});\"",
+    "build:android": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(wrapper + ' clean assembleDebug', {stdio:'inherit'});\"",
+    "build:release": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(wrapper + ' clean assembleRelease', {stdio:'inherit'});\"",
     "build:windows": "gradlew.bat clean assembleDebug",
     "build:unix": "./gradlew clean assembleDebug",
+    "build:server-exe": "node scripts/build-server-exe.js",
     "server": "cd server && npm start",
     "server:dev": "cd server && npm run dev",
+    "server:exe": "node scripts/start-server-exe.js",
     "install:server": "cd server && npm install",
-    "clean": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(`${wrapper} clean`, {stdio:'inherit'});\"",
+    "install:all": "npm install && npm run install:server",
+    "clean": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(wrapper + ' clean', {stdio:'inherit'});\"",
+    "validate": "npm run setup && npm run build && echo 'Build validation successful!'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -29,6 +34,9 @@
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "pkg": "^5.8.1",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
   }
 }

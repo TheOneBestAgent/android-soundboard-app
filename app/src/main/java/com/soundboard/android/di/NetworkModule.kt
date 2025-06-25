@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder
 import com.soundboard.android.network.SocketManager
 import com.soundboard.android.network.DeviceSessionManager
 import com.soundboard.android.network.SessionCoordinator
+import com.soundboard.android.network.ConnectionManager
 // Phase 4.2: Performance Optimization Components
 import com.soundboard.android.network.ConnectionPoolManager
 import com.soundboard.android.network.CacheManager
@@ -141,6 +142,12 @@ object NetworkModule {
     @Singleton
     fun providePerformanceMetrics(): PerformanceMetrics {
         return PerformanceMetrics()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideConnectionManager(): ConnectionManager {
+        return ConnectionManager()
     }
 }
 

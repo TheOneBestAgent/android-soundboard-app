@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import kotlin.math.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.*
@@ -762,7 +761,7 @@ private fun ComponentHealthCard(
         colors = CardDefaults.cardColors(
             containerColor = statusColor.copy(alpha = 0.1f)
         ),
-        border = BorderStroke(2.dp, statusColor.copy(alpha = 0.3f))
+        border = androidx.compose.foundation.BorderStroke(2.dp, statusColor.copy(alpha = 0.3f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -821,6 +820,12 @@ private fun getComponentIcon(component: ComponentType): androidx.compose.ui.grap
         ComponentType.METRICS -> Icons.Default.Analytics
         ComponentType.NETWORK -> Icons.Default.NetworkCheck
         ComponentType.SYSTEM -> Icons.Default.Computer
+        ComponentType.UI_MAIN -> Icons.Default.Home
+        ComponentType.UI_SETTINGS -> Icons.Default.Settings
+        ComponentType.UI_DIALOG -> Icons.Default.Chat
+        ComponentType.UI_LAYOUT -> Icons.Default.ViewQuilt
+        ComponentType.UI_SOUNDBOARD -> Icons.Default.VolumeUp
+        ComponentType.UI_MONITORING -> Icons.Default.Monitor
     }
 }
 
@@ -833,6 +838,12 @@ private fun formatComponentName(component: ComponentType): String {
         ComponentType.METRICS -> "Metrics"
         ComponentType.NETWORK -> "Network"
         ComponentType.SYSTEM -> "System"
+        ComponentType.UI_MAIN -> "Main UI"
+        ComponentType.UI_SETTINGS -> "Settings"
+        ComponentType.UI_DIALOG -> "Dialogs"
+        ComponentType.UI_LAYOUT -> "Layout"
+        ComponentType.UI_SOUNDBOARD -> "Soundboard"
+        ComponentType.UI_MONITORING -> "Monitoring"
     }
 }
 
@@ -1101,9 +1112,9 @@ private fun StatusChip(
         label = { Text(text) },
         enabled = enabled,
         modifier = modifier.padding(4.dp),
-        border = AssistChipDefaults.assistChipBorder(
-            borderColor = MaterialTheme.colorScheme.primary,
-            borderWidth = 1.dp
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary
         )
     )
 }
@@ -1120,7 +1131,7 @@ private fun Chip(
     trailingIcon: @Composable (() -> Unit)? = null,
     shape: Shape = MaterialTheme.shapes.small,
     elevation: CardElevation = CardDefaults.cardElevation(),
-    border: BorderStroke? = null,
+    border: androidx.compose.foundation.BorderStroke? = null,
     minHeight: Dp = 32.dp,
     paddingValues: PaddingValues = PaddingValues(horizontal = 8.dp),
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },

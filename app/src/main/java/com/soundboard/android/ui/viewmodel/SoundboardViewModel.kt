@@ -731,7 +731,7 @@ class SoundboardViewModel @Inject constructor(
                 soundboardRepository.insertLayout(duplicatedLayout)
                 _uiState.update { it.copy(errorMessage = null) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = "Failed to duplicate layout: ${e.gessage}") }
+                _uiState.update { it.copy(errorMessage = "Failed to duplicate layout: ${e.message}") }
             }
         }
     }
@@ -976,8 +976,8 @@ class SoundboardViewModel @Inject constructor(
             try {
                 val layout = SoundboardLayout(
                     name = layoutName,
-                    rows = template.preset.rows,
-                    columns = template.preset.columns,
+                    gridRows = template.preset.rows,
+                    gridColumns = template.preset.columns,
                     maxButtons = template.preset.columns * template.preset.rows
                 )
                 soundboardRepository.insertLayout(layout)
@@ -1009,50 +1009,11 @@ class SoundboardViewModel @Inject constructor(
         }
     }
 
-    fun deleteLayout(layout: SoundboardLayout) {
+    fun logEvent(event: LogEvent) {
         viewModelScope.launch {
-            loggingManager.logEvent(
-                LogEvent(
-                    level = LogLevel.INFO,
-                    category = LogCategory.USER_ACTION,
-                    message = "Deleting layout",
-                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
-                    component = ComponentType.UI_LAYOUT
-                )
-            )
-            try {
-                if (layout.isActive) {
-                    _uiState.update { it.copy(errorMessage = "Cannot delete active layout") }
-                    return@launch
-                }
-                
-                // TODO: Delete sound buttons for layout when layout relationship is implemented
-                soundboardRepository.deleteLayout(layout)
-                _uiState.update { it.copy(errorMessage = null) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = "Failed to delete layout: ${e.message}") }
-            }
+            loggingManager.logEvent(event)
         }
     }
 
-    fun updateLayout(layout: SoundboardLayout) {
-        viewModelScope.launch {
-            loggingManager.logEvent(
-                LogEvent(
-                    level = LogLevel.INFO,
-                    category = LogCategory.USER_ACTION,
-                    message = "Updating layout",
-                    metadata = mapOf("layoutId" to layout.id.toString(), "layoutName" to layout.name),
-                    component = ComponentType.UI_LAYOUT
-                )
-            )
-            try {
-                soundboardRepository.updateLayout(layout.copy(updatedAt = System.currentTimeMillis()))
-                _uiState.update { it.copy(errorMessage = null) }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(errorMessage = "Failed to update layout: ${e.message}") }
-            }
-        }
-    }
     
 } 

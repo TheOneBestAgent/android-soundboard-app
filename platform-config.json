@@ -14,8 +14,14 @@
       "jdk": {
         "defaultPaths": [
           "%JAVA_HOME%",
-          "C:/Program Files/Eclipse Adoptium/jdk-21.0.7.6-hotspot",
+          "C:/Program Files/Eclipse Adoptium/jdk-21.0.7.7-hotspot",
+          "C:/Program Files/Eclipse Adoptium/jdk-17.0.13.11-hotspot",
+          "C:/Program Files/Java/jdk-21",
+          "C:/Program Files/Java/jdk-17",
+          "%USERPROFILE%/.jdks/openjdk-21",
+          "%USERPROFILE%/.jdks/openjdk-17",
           "%USERPROFILE%/.jdks",
+          "./jdk-21.0.7+7",
           "./jdk-17.0.13+11",
           "./jdk-17.0.2"
         ]
@@ -45,8 +51,16 @@
       "jdk": {
         "defaultPaths": [
           "$JAVA_HOME",
+          "/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home",
           "/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home",
+          "/opt/homebrew/opt/openjdk@21",
+          "/opt/homebrew/opt/openjdk@17",
+          "/usr/local/opt/openjdk@21",
+          "/usr/local/opt/openjdk@17",
+          "$HOME/.jdks/openjdk-21",
+          "$HOME/.jdks/openjdk-17",
           "$HOME/.jdks",
+          "./jdk-21.0.7+7",
           "./jdk-17.0.13+11",
           "./jdk-17.0.2"
         ]
@@ -76,8 +90,15 @@
       "jdk": {
         "defaultPaths": [
           "$JAVA_HOME",
+          "/usr/lib/jvm/java-21-openjdk",
           "/usr/lib/jvm/java-17-openjdk",
+          "/usr/lib/jvm/java-21-openjdk-amd64",
+          "/usr/lib/jvm/java-17-openjdk-amd64",
+          "/snap/openjdk/current",
+          "$HOME/.jdks/openjdk-21",
+          "$HOME/.jdks/openjdk-17",
           "$HOME/.jdks",
+          "./jdk-21.0.7+7",
           "./jdk-17.0.13+11",
           "./jdk-17.0.2"
         ]
@@ -96,11 +117,13 @@
     }
   },
   "buildSettings": {
-    "compileSdk": 34,
-    "targetSdk": 34,
-    "minSdk": 24,
+    "compileSdk": 35,
+    "targetSdk": 35,
+    "minSdk": 26,
     "javaVersion": "17",
-    "gradleVersion": "8.4",
-    "agpVersion": "8.1.0"
+    "kotlinVersion": "2.1.0",
+    "gradleVersion": "8.11.1",
+    "agpVersion": "8.7.3",
+    "composeVersion": "2024.12.01"
   }
 } 

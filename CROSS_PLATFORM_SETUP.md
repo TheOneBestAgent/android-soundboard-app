@@ -21,9 +21,9 @@ This will automatically:
 ## 📋 Prerequisites
 
 ### All Platforms
-- **Node.js 18+** - [Download from nodejs.org](https://nodejs.org/)
-- **Android Studio** or **Android SDK Command Line Tools**
-- **JDK 17** - [Download OpenJDK 17](https://adoptium.net/)
+- **Node.js 20+** - [Download from nodejs.org](https://nodejs.org/)
+- **Android Studio 2024.2.1+** or **Android SDK Command Line Tools (API 35)**
+- **JDK 21** - [Download OpenJDK 21](https://adoptium.net/temurin/releases/?version=21)
 
 ### Platform-Specific Requirements
 
@@ -56,7 +56,7 @@ Create `local.properties` in the project root:
 ```properties
 # Replace paths with your actual SDK and JDK locations
 sdk.dir=/path/to/your/android-sdk
-java.home=/path/to/your/jdk-17
+java.home=/path/to/your/jdk-21
 ```
 
 ### 2. Configure Server Environment
@@ -105,15 +105,43 @@ npm run build:unix
 
 ## 🖥️ Running the Server
 
-### Development Mode
+### Quick Start
+```bash
+npm run server
+```
+
+### Development Mode (Auto-restart)
 ```bash
 npm run server:dev
 ```
 
-### Production Mode
+### Windows System Tray (Recommended for Windows)
 ```bash
-npm run server
+# PowerShell (Recommended)
+.\scripts\start-server-tray.ps1
+
+# Batch file
+.\scripts\start-server-tray.bat
+
+# Background/Silent mode
+.\scripts\start-server-tray.ps1 -Silent
 ```
+
+### Standalone Executable
+```bash
+# Build executable
+npm run build:server-exe
+
+# Run the built .exe
+.\dist\soundboard-server-win.exe
+```
+
+**Features of Windows Tray App:**
+- 🔄 Right-click to start/stop/restart server
+- 📊 System tray status indicator
+- 📝 Automatic logging
+- ⚙️ Settings and configuration
+- 🌐 Quick access to server dashboard
 
 ## 📱 Device Connection
 
@@ -162,12 +190,12 @@ The setup script automatically detects these paths:
 
 ### macOS
 - **Android SDK**: `~/Library/Android/sdk`
-- **JDK**: `/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home`
+- **JDK**: `/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home`
 - **ADB**: `~/Library/Android/sdk/platform-tools/adb`
 
 ### Linux
 - **Android SDK**: `~/Android/Sdk`
-- **JDK**: `/usr/lib/jvm/java-17-openjdk`
+- **JDK**: `/usr/lib/jvm/java-21-openjdk`
 - **ADB**: `~/Android/Sdk/platform-tools/adb`
 
 ## 🧪 Testing Your Setup
@@ -220,7 +248,7 @@ npm run clean
 npm run build
 
 # Check Java version
-java -version  # Should be 17.x
+java -version  # Should be 21.x
 ```
 
 ### Server Connection Issues
@@ -288,11 +316,11 @@ Set environment variables before running setup:
 ```bash
 # Windows
 set ANDROID_HOME=C:\custom\android-sdk
-set JAVA_HOME=C:\custom\jdk-17
+set JAVA_HOME=C:\custom\jdk-21
 
 # macOS/Linux
 export ANDROID_HOME=/custom/android-sdk
-export JAVA_HOME=/custom/jdk-17
+export JAVA_HOME=/custom/jdk-21
 
 npm run setup
 ```
@@ -313,6 +341,51 @@ The setup automatically configures for development. For production builds:
 2. Create signed APK configurations
 3. Set production environment variables
 
+## 📋 Project Structure (Updated)
+
+```
+android-soundboard-app/
+├── platform-config.json          # Platform-specific configurations (updated)
+├── scripts/
+│   ├── setup-environment.js      # Automated setup script (updated)
+│   ├── build-server-exe.js       # Build Windows executable
+│   ├── build-server-pkg.js       # Build with PKG
+│   ├── server-tray.js            # Windows system tray app
+│   ├── start-server-tray.ps1     # PowerShell tray launcher
+│   ├── start-server-tray.bat     # Batch tray launcher
+│   ├── build.sh                  # Unix build script (auto-generated)
+│   └── build.bat                 # Windows build script (auto-generated)
+├── server/
+│   ├── .env                      # Server environment (auto-generated)
+│   └── src/                      # Server source code
+├── app/                          # Android app source
+├── dist/                         # Built executables and packages
+├── local.properties              # SDK/JDK paths (auto-generated)
+├── SERVER_SETUP.md               # Detailed server setup guide
+└── package.json                  # Cross-platform npm scripts (updated)
+```
+
+## 🆕 New Features
+
+### Windows System Tray Application
+- **Background Operation**: Server runs silently in system tray
+- **Right-Click Controls**: Start, stop, restart server from tray menu
+- **Auto-Start**: Automatically starts server when Windows starts
+- **Log Management**: View and manage server logs
+- **Status Indicators**: Visual feedback on server status
+- **Settings Panel**: Configure port, auto-start, and other options
+
+### Cross-Platform Executables
+- **Windows**: Standalone .exe with tray functionality
+- **macOS**: App bundle with dock integration  
+- **Linux**: AppImage for universal compatibility
+
+### Enhanced Setup Script
+- **Latest SDK Detection**: Automatically finds Android SDK 35 and JDK 17/21
+- **Dependency Management**: Handles all server and build dependencies
+- **Validation**: Comprehensive environment validation
+- **Platform Optimization**: Platform-specific optimizations
+
 ---
 
-This setup ensures your Android Soundboard project works consistently across all platforms while maintaining optimal performance and compatibility. 
+This setup ensures your Android Soundboard project works consistently across all platforms while maintaining optimal performance and compatibility. The new Windows tray application provides professional-grade server management for seamless daily use. 
