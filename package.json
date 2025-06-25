@@ -2,7 +2,7 @@
   "name": "android-soundboard-app",
   "version": "1.0.0",
   "description": "Android Soundboard Application with Computer Connectivity",
-  "main": "server/src/server.js",
+  "main": "main.js",
   "scripts": {
     "setup": "node scripts/setup-environment.js",
     "build": "npm run setup && npm run build:android",
@@ -11,6 +11,11 @@
     "build:windows": "gradlew.bat clean assembleDebug",
     "build:unix": "./gradlew clean assembleDebug",
     "build:server-exe": "node scripts/build-server-exe.js",
+    "build:server-safe": "node scripts/build-server-pkg-safe.js",
+    "build:server-fixed": "node scripts/build-server-fixed.js",
+    "build:server-comprehensive": "node scripts/build-comprehensive.js",
+    "build:server-admin": "powershell -ExecutionPolicy Bypass -File scripts/build-admin.ps1",
+    "build:server-admin-force": "powershell -ExecutionPolicy Bypass -File scripts/build-admin.ps1 -Force",
     "server": "cd server && npm start",
     "server:dev": "cd server && npm run dev",
     "server:exe": "node scripts/start-server-exe.js",
@@ -38,5 +43,38 @@
     "pkg": "^5.8.1",
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8"
+  },
+  "homepage": "./",
+  "build": {
+    "appId": "com.soundboard.server-tray",
+    "productName": "Soundboard Server",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "scripts/server-tray.js",
+      "server/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Soundboard Server"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
   }
 }

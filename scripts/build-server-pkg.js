@@ -90,8 +90,8 @@ class SoundboardServerStandalone {
         this.logFile = path.join(os.tmpdir(), 'soundboard-server.log');
         
         console.log('🎵 Soundboard Server Starting...');
-        console.log(\`📡 Server will run on port: \${this.serverPort}\`);
-        console.log(\`📝 Logs will be saved to: \${this.logFile}\`);
+        console.log('📡 Server will run on port: ' + this.serverPort);
+        console.log('📝 Logs will be saved to: ' + this.logFile);
         
         this.startServer();
         this.setupSignalHandlers();
@@ -108,12 +108,12 @@ class SoundboardServerStandalone {
                 this.isRunning = true;
                 this.logToFile('Server started successfully');
                 console.log('✅ Server started successfully!');
-                console.log(\`🌐 Server URL: http://localhost:\${this.serverPort}\`);
+                console.log('🌐 Server URL: http://localhost:' + this.serverPort);
             } else {
-                throw new Error(\`Server file not found: \${serverPath}\`);
+                throw new Error('Server file not found: ' + serverPath);
             }
         } catch (error) {
-            this.logToFile(\`Error starting server: \${error.message}\`);
+            this.logToFile('Error starting server: ' + error.message);
             console.error('❌ Failed to start server:', error.message);
             process.exit(1);
         }
@@ -146,7 +146,7 @@ class SoundboardServerStandalone {
     
     logToFile(message) {
         const timestamp = new Date().toISOString();
-        const logMessage = \`[\${timestamp}] \${message}\\n\`;
+        const logMessage = '[' + timestamp + '] ' + message + '\\n';
         
         try {
             fs.appendFileSync(this.logFile, logMessage);
@@ -174,192 +174,111 @@ module.exports = SoundboardServerStandalone;
         console.log('🔨 Building executable with PKG...');
         
         try {
-            const standalonePath = path.join(this.buildDir, 'soundboard-server-standalone.js');
-            const outputPath = path.join(this.buildDir, 'soundboard-server');
+            // Build directly from the server directory
+            const serverMainPath = path.join(this.serverDir, 'src', 'server.js');
+            const outputPath = path.join(this.buildDir, 'soundboard-server-windows.exe');
             
-            // Copy server directory to build for inclusion
-            const serverBuildPath = path.join(this.buildDir, 'server');
-            if (fs.existsSync(this.serverDir)) {
-                this.copyDirectory(this.serverDir, serverBuildPath);
+            if (!fs.existsSync(serverMainPath)) {
+                throw new Error(`Server main file not found: ${serverMainPath}`);
             }
             
-            // Build for multiple platforms
-            const targets = [
-                'node18-win-x64',
-                'node18-linux-x64',
-                'node18-macos-x64'
-            ];
-            
-            targets.forEach(target => {
-                const platform = target.includes('win') ? '.exe' : '';
-                const outputFile = \`\${outputPath}-\${target.split('-')[1]}\${platform}\`;
-                
-                try {
-                    console.log(\`Building for \${target}...\`);
-                    execSync(\`pkg "\${standalonePath}" --target \${target} --output "\${outputFile}"\`, {
-                        cwd: this.buildDir,
-                        stdio: 'inherit'
-                    });
-                    console.log(\`✅ Built \${target}\`);
-                } catch (error) {
-                    console.warn(\`⚠️  Failed to build for \${target}: \${error.message}\`);
-                }
+            // Build for Windows
+            console.log('Building Windows executable...');
+            execSync(`pkg "${serverMainPath}" --target node18-win-x64 --output "${outputPath}"`, {
+                cwd: this.serverDir,
+                stdio: 'inherit'
             });
             
-            console.log('✅ PKG build completed');
+            console.log('✅ Windows executable built successfully!');
+            console.log(`📦 Output file: ${outputPath}`);
+            
+            // List build output
+            this.listBuildOutput();
+            
         } catch (error) {
-            throw new Error(\`PKG build failed: \${error.message}\`);
+            throw new Error(`PKG build failed: ${error.message}`);
         }
+    }
+    
+    listBuildOutput() {
+        console.log('\n📋 Build Output:');
+        
+        try {
+            const distContents = fs.readdirSync(this.buildDir);
+            distContents.forEach(file => {
+                const filePath = path.join(this.buildDir, file);
+                const stats = fs.statSync(filePath);
+                const size = stats.isFile() ? `(${(stats.size / 1024 / 1024).toFixed(2)} MB)` : '(directory)';
+                console.log(`   📁 ${file} ${size}`);
+            });
+        } catch (error) {
+            console.log('   (Could not list output files)');
+        }
+        
+        console.log('\n🎉 Build completed! You can now run the executable from the dist folder.');
+        console.log('\n💡 Usage:');
+        console.log('   • Double-click: start-soundboard-server.bat');
+        console.log('   • PowerShell: .\\start-soundboard-server.ps1');
+        console.log('   • Direct: .\\soundboard-server-windows.exe');
     }
     
     createTrayWrapper() {
-        console.log('📝 Creating Windows tray wrapper...');
+        console.log('📝 Creating Windows batch launcher...');
         
-        const trayWrapperCode = \`#!/usr/bin/env node
+        const batchLauncherCode = `@echo off
+title Soundboard Server
+echo 🎵 Starting Soundboard Server...
+echo.
+echo 📡 Server will be available at: http://localhost:3001
+echo 💡 Press Ctrl+C to stop the server
+echo.
 
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+"%~dp0soundboard-server-windows.exe"
 
-class WindowsTrayWrapper {
-    constructor() {
-        this.serverProcess = null;
-        this.isRunning = false;
-        this.serverExe = path.join(__dirname, 'soundboard-server-win.exe');
+if errorlevel 1 (
+    echo.
+    echo ❌ Server failed to start
+    pause
+) else (
+    echo.
+    echo ✅ Server stopped normally
+    pause
+)
+`;
         
-        if (process.platform === 'win32') {
-            this.startWithTray();
-        } else {
-            this.startDirect();
-        }
+        const batchPath = path.join(this.buildDir, 'start-soundboard-server.bat');
+        fs.writeFileSync(batchPath, batchLauncherCode);
+        
+        // Also create a PowerShell launcher
+        const psLauncherCode = `# Soundboard Server Launcher
+Write-Host "🎵 Starting Soundboard Server..." -ForegroundColor Green
+Write-Host ""
+Write-Host "📡 Server will be available at: http://localhost:3001" -ForegroundColor Cyan
+Write-Host "💡 Press Ctrl+C to stop the server" -ForegroundColor Yellow
+Write-Host ""
+
+$serverExe = Join-Path $PSScriptRoot "soundboard-server-windows.exe"
+
+if (Test-Path $serverExe) {
+    try {
+        & $serverExe
+        Write-Host ""
+        Write-Host "✅ Server stopped normally" -ForegroundColor Green
+    } catch {
+        Write-Host ""
+        Write-Host "❌ Server failed to start: $($_.Exception.Message)" -ForegroundColor Red
     }
-    
-    startWithTray() {
-        console.log('🪟 Starting Windows System Tray Server...');
-        
-        // For Windows, we'll create a simple tray using PowerShell
-        this.createTrayScript();
-        this.startServer();
-    }
-    
-    startDirect() {
-        console.log('🐧 Starting server directly...');
-        this.startServer();
-    }
-    
-    startServer() {
-        if (!fs.existsSync(this.serverExe)) {
-            console.error('❌ Server executable not found:', this.serverExe);
-            process.exit(1);
-        }
-        
-        this.serverProcess = spawn(this.serverExe, [], {
-            stdio: 'inherit',
-            detached: false
-        });
-        
-        this.isRunning = true;
-        console.log('✅ Server started with PID:', this.serverProcess.pid);
-        
-        this.serverProcess.on('exit', (code) => {
-            console.log(\`Server exited with code: \${code}\`);
-            this.isRunning = false;
-        });
-        
-        this.serverProcess.on('error', (error) => {
-            console.error('Server error:', error.message);
-            this.isRunning = false;
-        });
-        
-        // Keep the wrapper alive
-        process.on('SIGINT', () => {
-            this.stopServer();
-        });
-    }
-    
-    stopServer() {
-        if (this.serverProcess && this.isRunning) {
-            console.log('🛑 Stopping server...');
-            this.serverProcess.kill('SIGTERM');
-            
-            setTimeout(() => {
-                if (this.isRunning) {
-                    this.serverProcess.kill('SIGKILL');
-                }
-            }, 5000);
-        }
-    }
-    
-    createTrayScript() {
-        // Create a PowerShell script for system tray (Windows only)
-        const trayScript = \\\`
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
-# Create NotifyIcon
-\\$notifyIcon = New-Object System.Windows.Forms.NotifyIcon
-\\$notifyIcon.Icon = [System.Drawing.SystemIcons]::Application
-\\$notifyIcon.Text = "Soundboard Server"
-\\$notifyIcon.Visible = \\$true
-
-# Create context menu
-\\$contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
-\\$menuItemShow = New-Object System.Windows.Forms.ToolStripMenuItem
-\\$menuItemShow.Text = "Show Server"
-\\$menuItemRestart = New-Object System.Windows.Forms.ToolStripMenuItem
-\\$menuItemRestart.Text = "Restart Server"
-\\$menuItemExit = New-Object System.Windows.Forms.ToolStripMenuItem
-\\$menuItemExit.Text = "Exit"
-
-\\$contextMenu.Items.Add(\\$menuItemShow)
-\\$contextMenu.Items.Add(\\$menuItemRestart)
-\\$contextMenu.Items.Add("-")
-\\$contextMenu.Items.Add(\\$menuItemExit)
-
-\\$notifyIcon.ContextMenuStrip = \\$contextMenu
-
-# Event handlers
-\\$menuItemShow.Add_Click({
-    Start-Process "http://localhost:3001"
-})
-
-\\$menuItemRestart.Add_Click({
-    [System.Windows.Forms.MessageBox]::Show("Server restart functionality would be implemented here")
-})
-
-\\$menuItemExit.Add_Click({
-    \\$notifyIcon.Dispose()
-    [System.Windows.Forms.Application]::Exit()
-})
-
-# Show balloon tip
-\\$notifyIcon.ShowBalloonTip(3000, "Soundboard Server", "Server is running on port 3001", [System.Windows.Forms.ToolTipIcon]::Info)
-
-# Keep script running
-while (\\$true) {
-    Start-Sleep -Seconds 1
-    [System.Windows.Forms.Application]::DoEvents()
-}
-\\\`;
-        
-        const trayScriptPath = path.join(this.buildDir, 'tray.ps1');
-        fs.writeFileSync(trayScriptPath, trayScript);
-    }
+} else {
+    Write-Host "❌ Server executable not found: $serverExe" -ForegroundColor Red
 }
 
-// Initialize the wrapper
-if (require.main === module) {
-    new WindowsTrayWrapper();
-}
-
-module.exports = WindowsTrayWrapper;
-\`;
-
-        const wrapperPath = path.join(this.buildDir, 'soundboard-server-tray.js');
-        fs.writeFileSync(wrapperPath, trayWrapperCode);
+Read-Host "Press Enter to exit"
+`;
         
-        console.log('✅ Tray wrapper created');
+        const psPath = path.join(this.buildDir, 'start-soundboard-server.ps1');
+        fs.writeFileSync(psPath, psLauncherCode);
+        
+        console.log('✅ Launchers created');
     }
     
     copyDirectory(source, destination) {
