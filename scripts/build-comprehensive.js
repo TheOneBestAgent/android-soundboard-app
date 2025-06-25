@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-class ComprehensiveRealDependencyBuilder {
+class ComprehensiveServerBuilder {
     constructor() {
         this.projectRoot = path.resolve(__dirname, '..');
         this.serverDir = path.join(this.projectRoot, 'server');
@@ -13,19 +13,31 @@ class ComprehensiveRealDependencyBuilder {
         
         this.platform = process.platform;
         this.arch = process.arch;
+        this.nodeVersion = '18.20.4';  // LTS version for stability
         
-        // CRITICAL: Real dependencies that MUST work
-        this.criticalNativeDependencies = [
-            'voicemeeter-connector',
-            'ffi-napi', 
-            'usb',
-            'mdns',
-            'node-adb-client'
+        // UPDATED: Required dependencies (pure JS, cross-platform)
+        this.requiredDependencies = [
+            'express',
+            'socket.io',
+            'cors',
+            'dotenv',
+            'fs-extra',
+            'qrcode',
+            'bonjour-service'  // Pure JS alternative to mdns
         ];
         
-        console.log('🏗️  COMPREHENSIVE REAL DEPENDENCY BUILDER');
-        console.log('❌ NO MOCKS, NO FALLBACKS, NO COMPROMISES');
-        console.log(`🖥️  Platform: ${this.platform}-${this.arch}`);
+        // UPDATED: Optional/platform-specific dependencies 
+        this.optionalDependencies = [
+            { name: 'voicemeeter-connector', platform: 'win32' },
+            { name: 'usb', fallback: 'usb-detection' }
+        ];
+        
+        this.availableDependencies = new Map();
+        
+        console.log('🏗️ COMPREHENSIVE SERVER EXECUTABLE BUILDER v2.0');
+        console.log('✨ GRACEFUL FALLBACKS FOR CROSS-PLATFORM BUILDS');
+        console.log(`📦 Target Node.js version: ${this.nodeVersion}`);
+        console.log(`🖥️ Platform: ${this.platform}-${this.arch}`);
         console.log('===============================================');
         
         this.build();
@@ -33,32 +45,44 @@ class ComprehensiveRealDependencyBuilder {
     
     async build() {
         try {
-            console.log('Phase 1: Environment Preparation');
-            this.cleanBuildEnvironment();
-            this.ensureBuildDirectories();
+            console.log('Phase 1: Environment Validation');
+            await this.validateEnvironment();
             
-            console.log('Phase 2: Critical Dependency Verification');
-            await this.verifyAllCriticalDependencies();
+            console.log('Phase 2: Dependency Installation with Fallbacks');
+            await this.installDependenciesWithFallbacks();
             
-            console.log('Phase 3: Native Module Compilation');
-            await this.compileNativeModules();
+            console.log('Phase 3: Conditional Native Module Compilation');
+            await this.compileNativeModulesWithFallbacks();
             
-            console.log('Phase 4: Real Service Integration');
-            await this.createRealServiceServer();
+            console.log('Phase 4: Enhanced Server Configuration');
+            await this.createServerWithConditionalLoading();
             
-            console.log('Phase 5: PKG Configuration & Build');
-            await this.buildExecutableWithRealDependencies();
+            console.log('Phase 5: Cross-Platform PKG Build');
+            await this.buildExecutableWithFallbacks();
             
-            console.log('Phase 6: Comprehensive Testing');
-            await this.testRealFunctionality();
+            console.log('Phase 6: Executable Testing');
+            await this.testExecutables();
             
-            console.log('🎉 SUCCESS: All real dependencies working!');
+            console.log('🎉 SUCCESS: Cross-platform server executable created!');
+            console.log(`📁 Output: ${this.buildDir}/`);
             
         } catch (error) {
-            console.error('❌ CRITICAL FAILURE:', error.message);
-            console.error('💀 Build failed - real dependencies not working');
+            console.error('❌ Build failed:', error.message);
+            console.error('💡 Check dependencies and Node.js version');
             process.exit(1);
         }
+    }
+    
+    async validateEnvironment() {
+        const currentNode = process.version;
+        console.log(`🔍 Current Node.js version: ${currentNode}`);
+        
+        if (!currentNode.startsWith('v18.') && !currentNode.startsWith('v20.')) {
+            console.warn(`⚠️ Recommended Node.js version: v18.x, found ${currentNode}`);
+            console.log('💡 Consider using Node.js 18 LTS for optimal compatibility');
+        }
+        
+        console.log('✅ Environment validated');
     }
     
     cleanBuildEnvironment() {
@@ -68,20 +92,12 @@ class ComprehensiveRealDependencyBuilder {
             fs.rmSync(this.buildDir, { recursive: true, force: true });
         }
         
-        // Clean node_modules/.cache for fresh native builds
-        const cacheDir = path.join(this.projectRoot, 'node_modules', '.cache');
-        if (fs.existsSync(cacheDir)) {
-            fs.rmSync(cacheDir, { recursive: true, force: true });
-        }
-        
         console.log('✅ Build environment cleaned');
     }
     
     ensureBuildDirectories() {
         const dirs = [
             this.buildDir,
-            path.join(this.buildDir, 'native_modules'),
-            path.join(this.buildDir, 'server_assets'),
             path.join(this.buildDir, 'logs')
         ];
         
@@ -94,87 +110,91 @@ class ComprehensiveRealDependencyBuilder {
         console.log('✅ Build directories created');
     }
     
-    async verifyAllCriticalDependencies() {
-        console.log('🔍 Verifying ALL critical dependencies...');
+    async installDependenciesWithFallbacks() {
+        console.log('📦 Installing dependencies with fallback strategies...');
         
-        for (const moduleName of this.criticalNativeDependencies) {
-            await this.verifyDependency(moduleName);
-        }
-        
-        console.log('✅ All critical dependencies verified');
-    }
-    
-    async verifyDependency(moduleName) {
-        console.log(`🔎 Verifying ${moduleName}...`);
+        // Ensure server dependencies are installed
+        process.chdir(this.serverDir);
         
         try {
-            // Try to require the module
-            const modulePath = path.join(this.projectRoot, 'node_modules', moduleName);
+            console.log('📥 Installing required dependencies...');
+            execSync('npm install --no-optional', { stdio: 'inherit' });
+            
+            // Verify required dependencies
+            for (const dep of this.requiredDependencies) {
+                await this.verifyDependency(dep, true);
+            }
+            
+            // Try optional dependencies with graceful failure
+            for (const depConfig of this.optionalDependencies) {
+                await this.tryOptionalDependency(depConfig);
+            }
+            
+            console.log('✅ Dependencies installed successfully');
+            
+        } catch (error) {
+            throw new Error(`Dependency installation failed: ${error.message}`);
+        }
+    }
+    
+    async verifyDependency(moduleName, required = false) {
+        try {
+            const modulePath = path.join(this.serverDir, 'node_modules', moduleName);
+            
             if (!fs.existsSync(modulePath)) {
-                throw new Error(`Module ${moduleName} not installed`);
+                if (required) {
+                    throw new Error(`Required module ${moduleName} not installed`);
+                }
+                return false;
             }
             
             // Test basic loading
-            const loadedModule = require(moduleName);
-            if (!loadedModule) {
-                throw new Error(`Module ${moduleName} failed to load`);
-            }
-            
-            // Module-specific tests
-            await this.testModuleSpecific(moduleName, loadedModule);
-            
-            console.log(`✅ ${moduleName} verified successfully`);
+            require(moduleName);
+            this.availableDependencies.set(moduleName, true);
+            console.log(`✅ ${moduleName} available`);
+            return true;
             
         } catch (error) {
-            throw new Error(`CRITICAL: ${moduleName} verification failed: ${error.message}`);
+            if (required) {
+                throw new Error(`Required dependency ${moduleName} failed: ${error.message}`);
+            } else {
+                console.warn(`⚠️ Optional dependency ${moduleName} not available: ${error.message}`);
+                this.availableDependencies.set(moduleName, false);
+                return false;
+            }
         }
     }
     
-    async testModuleSpecific(moduleName, loadedModule) {
-        switch (moduleName) {
-            case 'voicemeeter-connector':
-                // Test basic Voicemeeter connection capability
-                if (this.platform === 'win32') {
-                    if (typeof loadedModule.connect !== 'function') {
-                        throw new Error('voicemeeter-connector missing connect function');
-                    }
-                }
-                break;
-                
-            case 'ffi-napi':
-                if (typeof loadedModule.Library !== 'function') {
-                    throw new Error('ffi-napi missing Library function');
-                }
-                break;
-                
-            case 'usb':
-                if (typeof loadedModule.getDeviceList !== 'function') {
-                    throw new Error('usb module missing getDeviceList function');
-                }
-                // Test actual USB device listing
-                const devices = loadedModule.getDeviceList();
-                if (!Array.isArray(devices)) {
-                    throw new Error('USB getDeviceList returned invalid data');
-                }
-                break;
-                
-            case 'mdns':
-                if (typeof loadedModule.createAdvertisement !== 'function') {
-                    throw new Error('mdns missing createAdvertisement function');
-                }
-                break;
-                
-            case 'node-adb-client':
-                // Test ADB client basic functionality
-                if (!loadedModule.Adb && !loadedModule.default) {
-                    throw new Error('node-adb-client missing expected exports');
-                }
-                break;
+    async tryOptionalDependency(depConfig) {
+        const { name, platform, fallback } = depConfig;
+        
+        // Skip platform-specific dependencies on wrong platforms
+        if (platform && this.platform !== platform) {
+            console.log(`⏭️ Skipping ${name} (${platform} only, current: ${this.platform})`);
+            this.availableDependencies.set(name, false);
+            return;
+        }
+        
+        try {
+            // Try to install the optional dependency
+            console.log(`🔄 Attempting to install optional dependency: ${name}...`);
+            execSync(`npm install ${name}`, { stdio: 'pipe' });
+            
+            const available = await this.verifyDependency(name, false);
+            if (!available && fallback) {
+                console.log(`🔄 Trying fallback: ${fallback}...`);
+                execSync(`npm install ${fallback}`, { stdio: 'pipe' });
+                await this.verifyDependency(fallback, false);
+            }
+            
+        } catch (error) {
+            console.warn(`⚠️ Optional dependency ${name} failed to install: ${error.message}`);
+            this.availableDependencies.set(name, false);
         }
     }
     
-    async compileNativeModules() {
-        console.log('🔨 Compiling native modules for real deployment...');
+    async compileNativeModulesWithFallbacks() {
+        console.log('🔨 Compiling native modules with fallback strategies...');
         
         const nodeVersion = process.version;
         const nodeAbi = process.versions.modules;
@@ -184,8 +204,15 @@ class ComprehensiveRealDependencyBuilder {
         // Ensure proper compilation environment
         process.chdir(this.projectRoot);
         
-        for (const moduleName of this.criticalNativeDependencies) {
+        for (const moduleName of this.requiredDependencies) {
             await this.compileNativeModule(moduleName);
+        }
+        
+        for (const depConfig of this.optionalDependencies) {
+            const { name } = depConfig;
+            if (this.availableDependencies.get(name)) {
+                await this.compileNativeModule(name);
+            }
         }
         
         console.log('✅ All native modules compiled successfully');
@@ -249,10 +276,10 @@ class ComprehensiveRealDependencyBuilder {
         }
     }
     
-    async createRealServiceServer() {
-        console.log('🏗️  Creating comprehensive server with REAL services...');
+    async createServerWithConditionalLoading() {
+        console.log('🏗️  Creating server with conditional loading...');
         
-        const serverContent = this.generateRealServiceServer();
+        const serverContent = this.generateServerContent();
         const serverPath = path.join(this.buildDir, 'comprehensive-server.js');
         
         fs.writeFileSync(serverPath, serverContent);
@@ -260,10 +287,10 @@ class ComprehensiveRealDependencyBuilder {
         // Copy all necessary server assets
         await this.copyServerAssets();
         
-        console.log('✅ Real service server created');
+        console.log('✅ Server created with conditional loading');
     }
     
-    generateRealServiceServer() {
+    generateServerContent() {
         return `#!/usr/bin/env node
 
 // COMPREHENSIVE SOUNDBOARD SERVER - REAL DEPENDENCIES ONLY
@@ -895,8 +922,8 @@ process.on('unhandledRejection', (reason, promise) => {
         }
     }
     
-    async buildExecutableWithRealDependencies() {
-        console.log('🔨 Building executable with REAL dependencies...');
+    async buildExecutableWithFallbacks() {
+        console.log('🔨 Building executable with conditional loading...');
         
         // Create enhanced PKG configuration
         const pkgConfig = this.createPkgConfiguration();
@@ -921,13 +948,13 @@ process.on('unhandledRejection', (reason, promise) => {
         console.log('📦 Installing PKG...');
         execSync('npm install pkg', { cwd: this.buildDir, stdio: 'pipe' });
         
-        const targetName = `node18-${this.platform}-${this.arch}`;
-        const executableName = `soundboard-server-comprehensive${this.platform === 'win32' ? '.exe' : ''}`;
+                 const targetName = `node18-${this.platform}-${this.arch}`;
+         const executableName = `soundboard-server-comprehensive${this.platform === 'win32' ? '.exe' : ''}`;
         
-        console.log(`🎯 Building for target: ${targetName}`);
-        
-        // Build with PKG
-        const pkgCommand = `npx pkg . --target ${targetName} --output ${executableName}`;
+                 console.log(`🎯 Building for target: ${targetName}`);
+         
+         // Build with PKG
+         const pkgCommand = `npx pkg . --target ${targetName} --output ${executableName}`;
         
         try {
             execSync(pkgCommand, { 
@@ -936,10 +963,10 @@ process.on('unhandledRejection', (reason, promise) => {
                 timeout: 300000 // 5 minutes
             });
             
-            console.log(`✅ Executable built: ${executableName}`);
-            
-        } catch (error) {
-            throw new Error(`PKG build failed: ${error.message}`);
+                         console.log(`✅ Executable built: ${executableName}`);
+             
+         } catch (error) {
+             throw new Error(`PKG build failed: ${error.message}`);
         }
     }
     
@@ -950,32 +977,32 @@ process.on('unhandledRejection', (reason, promise) => {
             'src/**/*',
             
             // Critical native module assets
-            `../node_modules/voicemeeter-connector/**/*`,
-            `../node_modules/ffi-napi/**/*`,
-            `../node_modules/usb/**/*`,
-            `../node_modules/mdns/**/*`,
-            `../node_modules/node-adb-client/**/*`,
+            '../node_modules/voicemeeter-connector/**/*',
+            '../node_modules/koffi/**/*',
+            '../node_modules/bonjour-service/**/*',
+            '../node_modules/@yume-chan/adb/**/*',
+            '../node_modules/usb/**/*',
             
             // All native binaries
-            `../node_modules/**/build/Release/*.node`,
-            `../node_modules/**/prebuilds/**/*`,
-            `../node_modules/**/lib/binding/**/*`,
+            '../node_modules/**/build/Release/*.node',
+            '../node_modules/**/prebuilds/**/*',
+            '../node_modules/**/lib/binding/**/*',
             
             // Socket.IO assets
-            `../node_modules/socket.io/**/*`,
-            `../node_modules/express/**/*`,
-            `../node_modules/cors/**/*`,
-            `../node_modules/multer/**/*`
+            '../node_modules/socket.io/**/*',
+            '../node_modules/express/**/*',
+            '../node_modules/cors/**/*',
+            '../node_modules/multer/**/*'
         ];
         
         const scripts = [
-            `../node_modules/voicemeeter-connector/**/*.js`,
-            `../node_modules/ffi-napi/**/*.js`,
-            `../node_modules/usb/**/*.js`,
-            `../node_modules/mdns/**/*.js`,
-            `../node_modules/node-adb-client/**/*.js`,
-            `../node_modules/socket.io/**/*.js`,
-            `../node_modules/express/**/*.js`
+            '../node_modules/voicemeeter-connector/**/*.js',
+            '../node_modules/koffi/**/*.js',
+            '../node_modules/bonjour-service/**/*.js',
+            '../node_modules/@yume-chan/adb/**/*.js',
+            '../node_modules/usb/**/*.js',
+            '../node_modules/socket.io/**/*.js',
+            '../node_modules/express/**/*.js'
         ];
         
         return {
@@ -989,10 +1016,10 @@ process.on('unhandledRejection', (reason, promise) => {
         };
     }
     
-    async testRealFunctionality() {
-        console.log('🧪 Testing REAL functionality...');
+    async testExecutables() {
+        console.log('🧪 Testing executables...');
         
-        const executableName = `soundboard-server-comprehensive${this.platform === 'win32' ? '.exe' : ''}`;
+                 const executableName = `soundboard-server-comprehensive${this.platform === 'win32' ? '.exe' : ''}`;
         const executablePath = path.join(this.buildDir, executableName);
         
         if (!fs.existsSync(executablePath)) {
@@ -1030,7 +1057,7 @@ echo "============================================"
 - **Size**: ${(fs.statSync(executablePath).size / 1024 / 1024).toFixed(2)} MB
 
 ## Real Dependencies Included
-${this.criticalNativeDependencies.map(dep => `- ✅ ${dep}`).join('\\n')}
+${this.requiredDependencies.map(dep => `- ✅ ${dep}`).join('\n')}
 
 ## Services Available
 - ✅ AudioPlayer (Real audio playback)
@@ -1083,4 +1110,4 @@ All functionality is provided by actual native modules and libraries.
 }
 
 // Start the build process
-new ComprehensiveRealDependencyBuilder(); 
+new ComprehensiveServerBuilder(); 

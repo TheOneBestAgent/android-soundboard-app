@@ -1,40 +1,32 @@
-package com.soundboard.android.data.database
+package com.audiodeck.connect.data.database
 
-import androidx.room.*
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.room.TypeConverter
 import android.content.Context
-import com.soundboard.android.data.dao.ConnectionHistoryDao
-import com.soundboard.android.data.dao.SoundButtonDao
-import com.soundboard.android.data.dao.SoundboardLayoutDao
-import com.soundboard.android.data.model.ConnectionHistory
-import com.soundboard.android.data.model.SoundButton
-import com.soundboard.android.data.model.SoundboardLayout
-import com.soundboard.android.data.model.LayoutPreset
+import androidx.room.*
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.audiodeck.connect.data.dao.*
+import com.audiodeck.connect.data.model.*
 
-// Type converters for Room database
-@TypeConverters(SoundboardTypeConverters::class)
 @Database(
     entities = [
         SoundButton::class,
-        SoundboardLayout::class,
+        AudioDeckLayout::class,
         ConnectionHistory::class
     ],
-    version = 3, // Updated for local file support
+    version = 3,
     exportSchema = false
 )
-abstract class SoundboardDatabase : RoomDatabase() {
+@TypeConverters(AudioDeckTypeConverters::class)
+abstract class AudioDeckDatabase : RoomDatabase() {
     
     abstract fun soundButtonDao(): SoundButtonDao
-    abstract fun soundboardLayoutDao(): SoundboardLayoutDao
+    abstract fun audioDeckLayoutDao(): AudioDeckLayoutDao
     abstract fun connectionHistoryDao(): ConnectionHistoryDao
     
     companion object {
-        const val DATABASE_NAME = "soundboard_database"
+        const val DATABASE_NAME = "audiodeck_database"
         
         @Volatile
-        private var INSTANCE: SoundboardDatabase? = null
+        private var INSTANCE: AudioDeckDatabase? = null
         
         // Migration from version 2 to 3 - add isLocalFile column
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -43,11 +35,11 @@ abstract class SoundboardDatabase : RoomDatabase() {
             }
         }
         
-        fun getDatabase(context: Context): SoundboardDatabase {
+        fun getDatabase(context: Context): AudioDeckDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
-                    SoundboardDatabase::class.java,
+                    AudioDeckDatabase::class.java,
                     DATABASE_NAME
                 )
                     .addMigrations(MIGRATION_2_3)
@@ -60,7 +52,7 @@ abstract class SoundboardDatabase : RoomDatabase() {
 }
 
 // Type converters for custom types
-class SoundboardTypeConverters {
+class AudioDeckTypeConverters {
     @TypeConverter
     fun fromLayoutPreset(preset: LayoutPreset): String {
         return preset.name

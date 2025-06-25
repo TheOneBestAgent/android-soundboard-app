@@ -1,13 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Background -->
     <path
-        android:fillColor="#FF6200EE"
-        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z"/>
+        android:fillColor="#1976D2"
+        android:pathData="M0,0h108v108h-108z"/>
+    
+    <!-- Gradient overlay -->
     <path
-        android:fillColor="#FF6200EE"
-        android:pathData="M8,12c0,2.21 1.79,4 4,4s4,-1.79 4,-4 -1.79,-4 -4,-4 -4,1.79 -4,4z"/>
+        android:fillColor="#0D47A1"
+        android:pathData="M0,108l54,-108l54,108z"
+        android:fillAlpha="0.3"/>
+        
+    <!-- Sound waves -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30c-13.25,0 -24,10.75 -24,24s10.75,24 24,24s24,-10.75 24,-24S67.25,30 54,30zM54,70c-8.84,0 -16,-7.16 -16,-16s7.16,-16 16,-16s16,7.16 16,16S62.84,70 54,70z"/>
+    
+    <!-- Center circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,46c-4.42,0 -8,3.58 -8,8s3.58,8 8,8s8,-3.58 8,-8S58.42,46 54,46z"/>
+    
+    <!-- Connection lines -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M54,24v-8M54,92v-8M84,54h8M24,54h-8"/>
 </vector> 

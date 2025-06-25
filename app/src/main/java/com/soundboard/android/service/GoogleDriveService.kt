@@ -1,4 +1,4 @@
-package com.soundboard.android.service
+package com.audiodeck.connect.service
 
 import android.content.Context
 import android.content.Intent
@@ -20,17 +20,18 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import javax.inject.ApplicationContext
 
 @Singleton
 class GoogleDriveService @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     private var driveService: Drive? = null
     private var googleSignInClient: GoogleSignInClient? = null
     
     companion object {
-        private const val SOUNDBOARD_FOLDER_NAME = "Soundboard Backups"
-        private const val BACKUP_FILE_PREFIX = "soundboard_backup_"
+        private const val AUDIODECK_FOLDER_NAME = "AudioDeck Connect Backups"
+        private const val MIME_TYPE_ZIP = "application/zip"
     }
     
     init {
@@ -100,17 +101,17 @@ class GoogleDriveService @Inject constructor(
                 val drive = driveService ?: throw IllegalStateException("Not signed in to Google Drive")
                 
                 // Create or get the Soundboard folder
-                val folderId = getOrCreateSoundboardFolder(drive)
+                val folderId = getOrCreateAudioDeckFolder(drive)
                 
                 // Create file metadata
                 val fileMetadata = File().apply {
-                    name = "${BACKUP_FILE_PREFIX}${fileName}.json"
+                    name = "${fileName}.json"
                     parents = listOf(folderId)
                 }
                 
                 // Create file content
                 val content = com.google.api.client.http.ByteArrayContent(
-                    "application/json",
+                    MIME_TYPE_ZIP,
                     backupData.toByteArray()
                 )
                 
@@ -148,17 +149,17 @@ class GoogleDriveService @Inject constructor(
             try {
                 val drive = driveService ?: throw IllegalStateException("Not signed in to Google Drive")
                 
-                val folderId = getOrCreateSoundboardFolder(drive)
+                val folderId = getOrCreateAudioDeckFolder(drive)
                 
                 val result = drive.files().list()
-                    .setQ("parents in '$folderId' and name contains '$BACKUP_FILE_PREFIX'")
+                    .setQ("parents in '$folderId' and name contains '$AUDIODECK_FOLDER_NAME'")
                     .setFields("files(id, name, createdTime, size)")
                     .execute()
                 
                 result.files?.map { file ->
                     BackupFile(
                         id = file.id,
-                        name = file.name.removePrefix(BACKUP_FILE_PREFIX).removeSuffix(".json"),
+                        name = file.name.removePrefix(AUDIODECK_FOLDER_NAME).removeSuffix(".json"),
                         createdTime = file.createdTime?.value ?: 0L,
                         size = file.getSize() ?: 0L
                     )
@@ -183,10 +184,10 @@ class GoogleDriveService @Inject constructor(
         }
     }
     
-    private fun getOrCreateSoundboardFolder(drive: Drive): String {
+    private fun getOrCreateAudioDeckFolder(drive: Drive): String {
         // Check if folder exists
         val result = drive.files().list()
-            .setQ("name='$SOUNDBOARD_FOLDER_NAME' and mimeType='application/vnd.google-apps.folder'")
+            .setQ("name='$AUDIODECK_FOLDER_NAME' and mimeType='application/vnd.google-apps.folder'")
             .setFields("files(id)")
             .execute()
         
@@ -195,7 +196,7 @@ class GoogleDriveService @Inject constructor(
         } else {
             // Create folder
             val folderMetadata = File().apply {
-                name = SOUNDBOARD_FOLDER_NAME
+                name = AUDIODECK_FOLDER_NAME
                 mimeType = "application/vnd.google-apps.folder"
             }
             

@@ -1,4 +1,4 @@
-package com.soundboard.android.ui.theme
+package com.audiodeck.connect.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -17,20 +17,20 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 // Icon-inspired theme with dark blue backgrounds and neon pink accents
-private val SoundboardDarkTheme = darkColorScheme(
+private val AudioDeckDarkTheme = darkColorScheme(
     primary = NeonPink,                    // Primary neon pink for buttons and accents
     onPrimary = TextPrimary,               // White text on primary elements
-    primaryContainer = DarkBlueVariant,     // Dark blue containers
-    onPrimaryContainer = NeonPinkLight,     // Light pink text in containers
+    primaryContainer = NeonPinkDark,     // Dark blue containers
+    onPrimaryContainer = TextPrimary,     // Light pink text in containers
     
-    secondary = CoralAccent,               // Coral for secondary elements
+    secondary = Coral,               // Coral for secondary elements
     onSecondary = TextPrimary,             // White text on secondary
-    secondaryContainer = ButtonSurface,     // Button surface color
-    onSecondaryContainer = CoralLight,      // Light coral text
+    secondaryContainer = CoralDark,     // Button surface color
+    onSecondaryContainer = TextPrimary,      // Light coral text
     
     tertiary = NeonPinkLight,              // Light pink for tertiary elements
-    onTertiary = DarkBlueBackground,        // Dark blue text on tertiary
-    tertiaryContainer = SurfaceVariant,     // Alternative surface
+    onTertiary = TextPrimary,        // Dark blue text on tertiary
+    tertiaryContainer = NeonPink,     // Alternative surface
     onTertiaryContainer = TextPrimary,      // White text in tertiary containers
     
     background = DarkBlueBackground,        // Deep dark blue background
@@ -51,7 +51,7 @@ private val SoundboardDarkTheme = darkColorScheme(
 )
 
 // Light theme for compatibility (though app focuses on dark theme)
-private val SoundboardLightTheme = lightColorScheme(
+private val AudioDeckLightTheme = lightColorScheme(
     primary = NeonPinkDark,
     onPrimary = TextPrimary,
     primaryContainer = NeonPinkLight,
@@ -74,8 +74,8 @@ private val SoundboardLightTheme = lightColorScheme(
 )
 
 @Composable
-fun AndroidSoundboardTheme(
-    darkTheme: Boolean = true, // Default to dark theme for soundboard aesthetic
+fun AudioDeckConnectTheme(
+    darkTheme: Boolean = true, // Default to dark theme for audio deck aesthetic
     // Disable dynamic color to maintain consistent branding
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
@@ -85,8 +85,8 @@ fun AndroidSoundboardTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> SoundboardDarkTheme
-        else -> SoundboardLightTheme
+        darkTheme -> AudioDeckDarkTheme
+        else -> AudioDeckLightTheme
     }
     
     val view = LocalView.current

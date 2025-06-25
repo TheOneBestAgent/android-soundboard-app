@@ -1,12 +1,11 @@
 const EventEmitter = require('events');
 const os = require('os');
 const path = require('path');
-const { Voicemeeter } = require('voicemeeter-connector');
 
 /**
  * Manages all interactions with the Voicemeeter Remote API.
  * This class handles initialization, connection, and audio playback routing.
- * It now uses the 'voicemeeter-connector' library for improved stability and API access.
+ * Enhanced with conditional loading for cross-platform executable builds.
  */
 class VoicemeeterManager extends EventEmitter {
     constructor(audioPlayer) {
@@ -15,65 +14,62 @@ class VoicemeeterManager extends EventEmitter {
         this.voicemeeter = null;
         this.isConnected = false;
         this.isAvailable = false;
-        this.platform = os.platform();
+        this.platform = process.platform;
         
-        if (this.platform === 'win32') {
-            console.log('🎛️ VoicemeeterManager initialized for platform: win32');
-            this.initializeVoicemeeter();
-        }
-    }
-
-    /**
-     * Initializes the Voicemeeter API using the 'voicemeeter-connector' library.
-     */
-    initializeVoicemeeter() {
-        console.log('🔌 Initializing Voicemeeter Connector API...');
-        Voicemeeter.init().then(vm => {
-            this.voicemeeter = vm;
-            this.isAvailable = true;
-            console.log('✅ Voicemeeter Connector initialized successfully.');
-            this.connect();
-        }).catch(err => {
-            console.warn('⚠️ Voicemeeter installation not found or failed to initialize with voicemeeter-connector.', err.message);
-            this.isAvailable = false;
-            this.isConnected = false;
-        });
-    }
-    
-    /**
-     * Connects to the Voicemeeter client application.
-     */
-    connect() {
-        if (!this.isAvailable || this.isConnected) {
+        console.log(`🎛️ VoicemeeterManager initializing for platform: ${this.platform}`);
+        
+        if (this.platform !== 'win32') {
+            console.log('🎛️ Voicemeeter not supported on this platform - using direct audio playback');
             return;
         }
         
         try {
-            console.log('🔗 Connecting to Voicemeeter...');
-            this.voicemeeter.connect();
-            this.isConnected = true;
-            const type = this.voicemeeter.$type;
-            const version = this.voicemeeter.$version;
-            console.log(`✅ Connected to Voicemeeter successfully`);
-            console.log(`🎛️ Voicemeeter Type: ${type}, Version: ${version}`);
-            this.emit('connected', { type, version });
+            console.log('🔌 Attempting to load Voicemeeter Connector...');
+            this.vm = require('voicemeeter-connector');
+            this.method = 'native';
+            console.log('✅ Voicemeeter Connector loaded successfully');
         } catch (error) {
-            console.error('❌ Failed to connect to Voicemeeter:', error);
-            this.isConnected = false;
-            this.emit('error', error);
+            console.warn('⚠️ Voicemeeter connector module not available:', error);
+            console.log('🔄 Falling back to direct audio playback');
+            this.method = 'direct';
         }
+    }
+
+    /**
+     * Connects to the Voicemeeter client application.
+     */
+    async connect() {
+        if (this.platform !== 'win32') {
+            return { status: 'direct', message: 'Using direct audio playback (non-Windows platform)' };
+        }
+        
+        if (this.method === 'native' && this.vm) {
+            try {
+                await this.vm.connect();
+                return { status: 'connected', message: 'Connected to Voicemeeter' };
+            } catch (error) {
+                console.error('❌ Failed to connect to Voicemeeter:', error);
+                return { status: 'error', message: error.message };
+            }
+        }
+        
+        return { status: 'direct', message: 'Using direct audio playback (Voicemeeter not available)' };
     }
     
     /**
      * Disconnects from the Voicemeeter client application.
      */
-    disconnect() {
-        if (this.isConnected) {
-            this.voicemeeter.disconnect();
-            this.isConnected = false;
-            console.log('🔌 Disconnected from Voicemeeter.');
-            this.emit('disconnected');
+    async disconnect() {
+        if (this.method === 'native' && this.vm) {
+            try {
+                await this.vm.disconnect();
+                return { status: 'disconnected', message: 'Disconnected from Voicemeeter' };
+            } catch (error) {
+                console.error('❌ Failed to disconnect from Voicemeeter:', error);
+                return { status: 'error', message: error.message };
+            }
         }
+        return { status: 'ok', message: 'No active Voicemeeter connection to disconnect' };
     }
 
     /**
@@ -254,10 +250,10 @@ class VoicemeeterManager extends EventEmitter {
     getStatus() {
         return {
             platform: this.platform,
-            available: this.isAvailable,
-            connected: this.isConnected,
-            version: this.isConnected && this.voicemeeter ? this.voicemeeter.$version : null,
-            type: this.isConnected && this.voicemeeter ? this.voicemeeter.$type : null
+            method: this.method || 'direct',
+            isWindows: this.platform === 'win32',
+            hasVoicemeeter: this.method === 'native' && !!this.vm,
+            connectionStatus: this.vm ? 'available' : 'unavailable'
         };
     }
     
@@ -268,5 +264,4 @@ class VoicemeeterManager extends EventEmitter {
     }
 }
 
-module.exports = VoicemeeterManager; 
 module.exports = VoicemeeterManager; 

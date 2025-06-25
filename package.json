@@ -1,8 +1,9 @@
 {
-  "name": "android-soundboard-app",
-  "version": "1.0.0",
-  "description": "Android Soundboard Application with Computer Connectivity",
-  "main": "main.js",
+  "name": "audiodeck-connect-server",
+  "version": "8.0.0",
+  "description": "Enterprise-grade server component for AudioDeck Connect - Professional audio control platform",
+  "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "setup": "node scripts/setup-environment.js",
     "build": "npm run setup && npm run build:android",
