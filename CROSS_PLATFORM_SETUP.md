@@ -18,12 +18,26 @@ This will automatically:
 - Install server dependencies
 - Validate build environment
 
+## 🎯 Perfect Setup (2025 Stable Configuration)
+
+This project uses the **latest stable versions** for optimal compatibility:
+
+| Component | Version | Status |
+|-----------|---------|---------|
+| **Gradle** | `8.14.2` | ✅ Latest Stable |
+| **Android SDK** | `API 35` | ✅ Latest Stable |
+| **Android Gradle Plugin** | `8.7.3` | ✅ Latest Stable |
+| **JDK** | `17 (LTS)` | ✅ Recommended |
+| **Kotlin** | `2.1.0` | ✅ Latest Stable |
+| **Compose** | `2024.12.01` | ✅ Latest BOM |
+
 ## 📋 Prerequisites
 
 ### All Platforms
 - **Node.js 20+** - [Download from nodejs.org](https://nodejs.org/)
 - **Android Studio 2024.2.1+** or **Android SDK Command Line Tools (API 35)**
-- **JDK 21** - [Download OpenJDK 21](https://adoptium.net/temurin/releases/?version=21)
+- **JDK 17** (LTS) - [Download OpenJDK 17](https://adoptium.net/temurin/releases/?version=17)
+- **Gradle 8.14.2** (Latest Stable) - Automatically downloaded by wrapper
 
 ### Platform-Specific Requirements
 
@@ -56,7 +70,7 @@ Create `local.properties` in the project root:
 ```properties
 # Replace paths with your actual SDK and JDK locations
 sdk.dir=/path/to/your/android-sdk
-java.home=/path/to/your/jdk-21
+java.home=/path/to/your/jdk-17
 ```
 
 ### 2. Configure Server Environment
@@ -185,17 +199,17 @@ The setup script automatically detects these paths:
 
 ### Windows
 - **Android SDK**: `%LOCALAPPDATA%\Android\Sdk`
-- **JDK**: `%USERPROFILE%\.jdks` or `%JAVA_HOME%`
+- **JDK 17**: `%USERPROFILE%\.jdks\openjdk-17` or `%JAVA_HOME%`
 - **ADB**: `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`
 
 ### macOS
 - **Android SDK**: `~/Library/Android/sdk`
-- **JDK**: `/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home`
+- **JDK 17**: `/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home`
 - **ADB**: `~/Library/Android/sdk/platform-tools/adb`
 
 ### Linux
 - **Android SDK**: `~/Android/Sdk`
-- **JDK**: `/usr/lib/jvm/java-21-openjdk`
+- **JDK 17**: `/usr/lib/jvm/java-17-openjdk-amd64`
 - **ADB**: `~/Android/Sdk/platform-tools/adb`
 
 ## 🧪 Testing Your Setup
@@ -248,7 +262,7 @@ npm run clean
 npm run build
 
 # Check Java version
-java -version  # Should be 21.x
+java -version  # Should be 17.x
 ```
 
 ### Server Connection Issues
@@ -316,11 +330,11 @@ Set environment variables before running setup:
 ```bash
 # Windows
 set ANDROID_HOME=C:\custom\android-sdk
-set JAVA_HOME=C:\custom\jdk-21
+set JAVA_HOME=C:\custom\jdk-17
 
 # macOS/Linux
 export ANDROID_HOME=/custom/android-sdk
-export JAVA_HOME=/custom/jdk-21
+export JAVA_HOME=/custom/jdk-17
 
 npm run setup
 ```
@@ -381,7 +395,8 @@ android-soundboard-app/
 - **Linux**: AppImage for universal compatibility
 
 ### Enhanced Setup Script
-- **Latest SDK Detection**: Automatically finds Android SDK 35 and JDK 17/21
+- **Latest SDK Detection**: Automatically finds Android SDK 35 and JDK 17
+- **Perfect Version Management**: Uses Gradle 8.14.2 + AGP 8.7.3 + Kotlin 2.1.0
 - **Dependency Management**: Handles all server and build dependencies
 - **Validation**: Comprehensive environment validation
 - **Platform Optimization**: Platform-specific optimizations

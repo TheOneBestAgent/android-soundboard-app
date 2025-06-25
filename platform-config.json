@@ -122,8 +122,10 @@
     "minSdk": 26,
     "javaVersion": "17",
     "kotlinVersion": "2.1.0",
-    "gradleVersion": "8.11.1",
+    "gradleVersion": "8.14.2",
     "agpVersion": "8.7.3",
-    "composeVersion": "2024.12.01"
+    "composeVersion": "2024.12.01",
+    "kspVersion": "2.1.0-1.0.29",
+    "hiltVersion": "2.54"
   }
 } 
