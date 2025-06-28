@@ -1,13 +1,15 @@
-const EventEmitter = require('events');
-const os = require('os');
-const path = require('path');
+import EventEmitter from 'events';
+import { Connector } from 'voicemeeter-connector';
+import koffi from 'koffi';
+import os from 'os';
+import path from 'path';
 
 /**
  * Manages all interactions with the Voicemeeter Remote API.
  * This class handles initialization, connection, and audio playback routing.
  * Enhanced with conditional loading for cross-platform executable builds.
  */
-class VoicemeeterManager extends EventEmitter {
+export class VoicemeeterManager extends EventEmitter {
     constructor(audioPlayer) {
         super();
         this.audioPlayer = audioPlayer;
@@ -33,6 +35,7 @@ class VoicemeeterManager extends EventEmitter {
             console.log('🔄 Falling back to direct audio playback');
             this.method = 'direct';
         }
+        this.emitStatus();
     }
 
     /**
@@ -262,6 +265,10 @@ class VoicemeeterManager extends EventEmitter {
         console.log('🛑 Shutting down VoicemeeterManager...');
         await this.disconnect();
     }
+
+    emitStatus() {
+        this.emit('status', this.getStatus());
+    }
 }
 
-module.exports = VoicemeeterManager; 
+export default VoicemeeterManager; 

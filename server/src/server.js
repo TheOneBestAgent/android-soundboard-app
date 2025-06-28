@@ -2,27 +2,32 @@
 // Professional audio control platform with real-time communication
 
 import express from 'express';
-import { createServer } from 'http';
+import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+// import { fileURLToPath } from 'url';
 
-import { AudioManager } from './audio/AudioManager.js';
+// Import local modules
+import { AudioPlayer } from './audio/AudioPlayer.js';
 import { VoicemeeterManager } from './audio/VoicemeeterManager.js';
 import { AdbManager } from './device/AdbManager.js';
-import { USBAutoDetectionService } from './device/USBAutoDetectionService.js';
+// import { USBAutoDetectionService } from './network/USBAutoDetectionService.js';
 import { NetworkDiscoveryService } from './network/NetworkDiscoveryService.js';
 import { HealthMonitor } from './monitoring/HealthMonitor.js';
+import mcpRouter from './routes/mcp.js';
+import healthRouter from './routes/health.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 class AudioDeckServer {
     constructor() {
         this.app = express();
-        this.server = createServer(this.app);
+        this.server = http.createServer(this.app);
         this.io = new Server(this.server, {
             cors: {
                 origin: '*',
@@ -40,23 +45,45 @@ class AudioDeckServer {
     setupMiddleware() {
         this.app.use(cors());
         this.app.use(express.json());
-        this.app.use(express.static(path.join(__dirname, 'public')));
+        this.app.use(express.static(path.join(process.cwd(), 'server', 'src', 'public')));
     }
     
     async initializeServices() {
         // Initialize core services
-        this.audioManager = new AudioManager();
+        this.audioManager = new AudioPlayer();
         this.voicemeeterManager = new VoicemeeterManager();
         this.adbManager = new AdbManager();
-        this.usbService = new USBAutoDetectionService();
+        // this.usbService = new USBAutoDetectionService();
         this.discoveryService = new NetworkDiscoveryService();
         this.healthMonitor = new HealthMonitor();
         
         // Start services
-        await this.voicemeeterManager.connect();
-        await this.adbManager.initialize();
-        await this.usbService.startMonitoring();
-        await this.discoveryService.start();
+        try {
+            await this.voicemeeterManager.connect();
+        } catch (error) {
+            console.warn('Voicemeeter not found or failed to connect. Running in standalone mode.');
+        }
+
+        try {
+            await this.adbManager.initialize();
+        } catch (error) {
+            console.warn('ADB could not be initialized. USB connection features will be unavailable.');
+        }
+
+        /*
+        try {
+            await this.usbService.startMonitoring();
+        } catch (error) {
+            console.warn('USB auto-detection service failed to start.');
+        }
+        */
+
+        try {
+            await this.discoveryService.start();
+        } catch (error) {
+            console.warn('Network discovery service failed to start.');
+        }
+        
         this.healthMonitor.startMonitoring();
         
         console.log('🚀 AudioDeck Connect services initialized');
@@ -77,11 +104,15 @@ class AudioDeckServer {
                     audio: this.audioManager.getStatus(),
                     voicemeeter: this.voicemeeterManager.getStatus(),
                     adb: this.adbManager.getStatus(),
-                    usb: this.usbService.getStatus(),
+                    // usb: this.usbService.getStatus(),
                     discovery: this.discoveryService.getStatus()
                 }
             });
         });
+        
+        // MCP Routes
+        this.app.use('/api/mcp', mcpRouter);
+        this.app.use('/health', healthRouter);
         
         // Additional routes...
     }
@@ -108,28 +139,14 @@ class AudioDeckServer {
     }
     
     start() {
-        this.server.listen(this.port, () => {
-            console.log(`
-============================================================
-🎵 AudioDeck Connect Server
-============================================================
-Server running on port ${this.port}
-Platform: ${process.platform}
-Mode: Enterprise (v8.0.0)
-
-Endpoints:
-  Health Check: http://localhost:${this.port}/health
-  Server Info:  http://localhost:${this.port}/info
-  Audio Control: WebSocket
-  
-Features:
-  ✓ Real-time audio control
-  ✓ Multi-platform support
-  ✓ Enterprise-grade reliability
-  ✓ Professional audio integration
-  ✓ Automated device discovery
-  ✓ Health monitoring
-============================================================`);
+        this.server.listen(this.port, '0.0.0.0', () => {
+            console.log(`\n============================================================`);
+            console.log(`🎵 AudioDeck Connect Server`);
+            console.log(`============================================================`);
+            console.log(`Server running on port ${this.port}`);
+            console.log(`Platform: ${process.platform}`);
+            console.log(`Mode: Enterprise (v9.0.0)`);
+            console.log(`============================================================`);
         });
     }
 }

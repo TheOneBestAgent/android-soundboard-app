@@ -1,145 +1,83 @@
 // AudioDeck Connect - ADB Device Manager
 // Handles Android device communication and management
 
-import { AdbDaemon, AdbClient } from '@yume-chan/adb';
-import { USBDeviceManager } from './USBDeviceManager.js';
+import { Adb, AdbServerClient } from '@yume-chan/adb';
+import { AdbServerNodeTcpConnector } from '@yume-chan/adb-server-node-tcp';
 import EventEmitter from 'events';
 
-class AdbManager extends EventEmitter {
+export class AdbManager extends EventEmitter {
     constructor() {
         super();
         this.devices = new Map();
-        this.usbManager = new USBDeviceManager();
-        this.daemon = null;
-        this.client = null;
+        this.client = undefined;
         this.isInitialized = false;
+        this.tracking = false;
         
         console.log('🤖 ADB Manager initializing...');
     }
     
     async initialize() {
+        if (this.isInitialized) {
+            console.log('🤖 ADB Manager already initialized');
+            return;
+        }
+
         try {
-            if (this.isInitialized) {
-                console.log('🤖 ADB Manager already initialized');
-                return;
-            }
-            
-            // Initialize USB device detection
-            await this.usbManager.initialize();
-            
-            // Listen for USB device events
-            this.usbManager.on('deviceAttached', async (device) => {
-                console.log('📱 USB device attached:', device);
-                await this.handleDeviceAttached(device);
-            });
-            
-            this.usbManager.on('deviceDetached', async (device) => {
-                console.log('📱 USB device detached:', device);
-                await this.handleDeviceDetached(device);
-            });
-            
-            // Start ADB daemon
-            this.daemon = new AdbDaemon();
-            await this.daemon.start();
-            
-            // Create ADB client
-            this.client = new AdbClient(this.daemon);
-            
+            // Establish connection to the ADB server
+            const connector = AdbServerNodeTcpConnector.create();
+            this.client = await connector.connect();
             this.isInitialized = true;
-            console.log('✅ ADB Manager initialized successfully');
-            
+            console.log('✅ ADB Manager initialized successfully and connected to ADB server.');
+
+            // Start tracking devices
+            this.startTracking();
+
         } catch (error) {
-            console.error('❌ Failed to initialize ADB Manager:', error);
-            throw error;
+            console.error('❌ Failed to initialize ADB Manager or connect to ADB server:', error);
+            this.isInitialized = false;
+            // Optionally, retry connection after a delay
+            setTimeout(() => this.initialize(), 10000);
         }
     }
     
-    async handleDeviceAttached(device) {
-        try {
-            // Check if device is an Android device
-            if (!await this.isAndroidDevice(device)) {
-                console.log('ℹ️ Not an Android device, skipping...');
-                return;
-            }
-            
-            // Connect to device
-            const connection = await this.client.connect(device);
-            
-            // Get device info
-            const deviceInfo = await this.getDeviceInfo(connection);
-            
-            // Store device
-            this.devices.set(deviceInfo.serial, {
-                device,
-                connection,
-                info: deviceInfo,
-                status: 'connected',
-                timestamp: new Date()
-            });
-            
-            // Emit device connected event
-            this.emit('deviceConnected', deviceInfo);
-            
-            console.log('✅ Android device connected:', deviceInfo.model);
-            
-        } catch (error) {
-            console.error('❌ Failed to handle device attachment:', error);
-            this.emit('error', error);
-        }
-    }
-    
-    async handleDeviceDetached(device) {
-        try {
-            // Find device in our map
-            for (const [serial, data] of this.devices.entries()) {
-                if (data.device === device) {
-                    // Close connection
-                    await data.connection.close();
-                    
-                    // Remove from map
-                    this.devices.delete(serial);
-                    
-                    // Emit device disconnected event
-                    this.emit('deviceDisconnected', data.info);
-                    
-                    console.log('📱 Android device disconnected:', data.info.model);
-                    break;
+    async startTracking() {
+        if (this.tracking || !this.client) return;
+        this.tracking = true;
+        console.log('👀 Starting to track ADB devices...');
+
+        (async () => {
+            try {
+                const tracker = await this.client.trackDevices();
+                for await (const device of tracker) {
+                    if (device.state === 'device') {
+                        if (!this.devices.has(device.serial)) {
+                            // New device connected
+                            const adb = await device.connect();
+                            this.devices.set(device.serial, { adb, info: device });
+                            this.emit('deviceConnected', device);
+                            console.log(`✅ Device connected: ${device.serial}`);
+                        }
+                    } else if (device.state === 'offline' || device.state === 'unauthorized') {
+                        if (this.devices.has(device.serial)) {
+                            // Device disconnected or went offline
+                            const disconnectedDevice = this.devices.get(device.serial);
+                            this.devices.delete(device.serial);
+                            this.emit('deviceDisconnected', disconnectedDevice.info);
+                            console.log(`❌ Device disconnected: ${device.serial}`);
+                        }
+                    }
                 }
+            } catch (e) {
+                console.error('Device tracking failed:', e);
+                this.tracking = false;
+                // Optional: try to restart tracking
+                setTimeout(() => this.startTracking(), 5000);
             }
-        } catch (error) {
-            console.error('❌ Failed to handle device detachment:', error);
-            this.emit('error', error);
-        }
+        })();
     }
     
-    async isAndroidDevice(device) {
-        try {
-            const descriptor = await device.getDescriptor();
-            return descriptor.idVendor === 0x18D1 || // Google
-                   descriptor.idVendor === 0x04E8 || // Samsung
-                   descriptor.idVendor === 0x12D1;   // Huawei
-        } catch (error) {
-            console.error('❌ Failed to check device type:', error);
-            return false;
-        }
-    }
-    
-    async getDeviceInfo(connection) {
-        const props = await connection.getProperties();
-        
-        return {
-            serial: props['ro.serialno'],
-            model: props['ro.product.model'],
-            manufacturer: props['ro.product.manufacturer'],
-            version: props['ro.build.version.release'],
-            sdk: props['ro.build.version.sdk'],
-            fingerprint: props['ro.build.fingerprint'],
-            capabilities: {
-                audio: true,
-                usb: true,
-                adb: true
-            }
-        };
+    getConnectedDevices() {
+        return Array.from(this.devices.values()).map(d => d.info);
     }
     
     async executeCommand(serial, command) {
@@ -149,59 +87,32 @@ class AdbManager extends EventEmitter {
         }
         
         try {
-            const shell = await device.connection.shell(command);
+            const shell = await device.adb.shell(command);
             const output = await shell.readAll();
-            return output.toString().trim();
+            return new TextDecoder().decode(output);
         } catch (error) {
             console.error(`❌ Failed to execute command "${command}":`, error);
             throw error;
         }
     }
     
-    getConnectedDevices() {
-        return Array.from(this.devices.values()).map(({ info, status, timestamp }) => ({
-            ...info,
-            status,
-            connectedSince: timestamp
-        }));
-    }
-    
     async shutdown() {
         console.log('🤖 Shutting down ADB Manager...');
-        
-        // Close all device connections
-        for (const [serial, data] of this.devices.entries()) {
-            try {
-                await data.connection.close();
-                console.log(`📱 Closed connection to device: ${data.info.model}`);
-            } catch (error) {
-                console.error(`❌ Failed to close connection to device ${serial}:`, error);
-            }
+        if (this.client) {
+            await this.client.killServer();
         }
-        
-        // Clear devices map
-        this.devices.clear();
-        
-        // Stop USB manager
-        await this.usbManager.shutdown();
-        
-        // Stop ADB daemon
-        if (this.daemon) {
-            await this.daemon.stop();
-        }
-        
+        this.tracking = false;
         this.isInitialized = false;
+        this.devices.clear();
         console.log('✅ ADB Manager shutdown complete');
     }
-    
+
     getStatus() {
         return {
             isInitialized: this.isInitialized,
-            connectedDevices: this.getConnectedDevices(),
-            usbManagerStatus: this.usbManager.getStatus(),
-            timestamp: new Date()
+            isTracking: this.tracking,
+            connectedDevicesCount: this.devices.size,
+            devices: this.getConnectedDevices(),
         };
     }
-}
-
-export default AdbManager; 
+} 

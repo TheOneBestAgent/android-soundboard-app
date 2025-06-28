@@ -1,53 +1,46 @@
 {
-  "name": "audiodeck-connect-server",
-  "version": "8.0.0",
-  "description": "Enterprise-grade server component for AudioDeck Connect - Professional audio control platform",
-  "main": "src/server.js",
+  "name": "soundboard-server",
+  "version": "9.0.0",
+  "description": "Enterprise server for the Android Soundboard application.",
   "type": "module",
+  "main": "dist/server.js",
+  "bin": "dist/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "test": "jest",
-    "build": "node scripts/build.js",
-    "build:enterprise": "node scripts/build-enterprise.js",
-    "setup": "node scripts/setup-environment.js"
+    "start": "node dist/server.js",
+    "build": "node build.cjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5",
+    "@homebridge/ciao": "^1.1.7",
+    "@yume-chan/adb": "^2.1.0",
+    "@yume-chan/adb-server-node-tcp": "^2.1.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "fs-extra": "^11.2.0",
-    "qrcode": "^1.5.3",
-    "@koffi/koffi": "^2.8.9",
-    "@homebridge/ciao": "^1.3.0",
-    "@yume-chan/adb": "^2.1.0",
-    "usb": "^2.11.0"
+    "express": "^4.19.2",
+    "fs-extra": "^11.3.0",
+    "socket.io": "^4.7.5"
   },
   "optionalDependencies": {
-    "voicemeeter-connector": "^1.0.3"
+    "voicemeeter-connector": "^2.0.1"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.27.2",
+    "@babel/core": "^7.27.7",
+    "@babel/preset-env": "^7.27.2",
+    "esbuild": "^0.25.5",
+    "pkg": "^5.8.1"
   },
   "pkg": {
     "assets": [
-      "src/**/*",
-      "../audio/**/*",
-      "node_modules/koffi/**/*",
-      "node_modules/bonjour-service/**/*",
-      "node_modules/@yume-chan/adb/**/*",
-      "node_modules/usb/**/*",
-      "node_modules/**/prebuilds/**/*",
-      "enterprise-assets/**/*"
+      "audio/**/*",
+      "node_modules/voicemeeter-connector/**/*",
+      "node_modules/koffi/**/*"
     ],
-    "scripts": [
-      "src/**/*.js",
-      "node_modules/koffi/**/*.js",
-      "node_modules/bonjour-service/**/*.js",
-      "node_modules/@yume-chan/adb/**/*.js"
+    "targets": [
+      "node18-macos-arm64"
     ],
-    "targets": ["node18-win-x64", "node18-linux-x64", "node18-macos-x64", "node18-macos-arm64"]
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "outputPath": "dist"
   }
 }

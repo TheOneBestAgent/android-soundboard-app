@@ -1,9 +1,9 @@
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs-extra');
-const os = require('os');
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs-extra';
+import os from 'os';
 
-class AudioPlayer {
+export class AudioPlayer {
     constructor() {
         this.platform = process.platform;
         this.audioDir = path.join(__dirname, '../../audio');
@@ -335,6 +335,4 @@ class AudioPlayer {
         
         return true;
     }
-}
-
-module.exports = AudioPlayer; 
+} 

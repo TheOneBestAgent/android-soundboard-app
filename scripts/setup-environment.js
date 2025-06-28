@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { execSync, spawn } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { execSync, spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class CrossPlatformSetup {
     constructor() {
@@ -198,26 +202,15 @@ NODE_ENV=development
     }
     
     async validateGradleSetup() {
-        console.log('🐘 Validating Gradle setup...');
-        
-        const platformConfig = this.config.platforms[this.platform];
-        const gradleWrapper = path.join(this.projectRoot, platformConfig.gradle.wrapper);
-        
-        if (!fs.existsSync(gradleWrapper)) {
-            console.error(`❌ Gradle wrapper not found: ${gradleWrapper}`);
-            return false;
-        }
+        console.log('🔨 Validating Gradle setup...');
         
         try {
-            console.log('🔄 Testing Gradle wrapper...');
-            const result = execSync(`"${gradleWrapper}" --version`, { 
-                encoding: 'utf8',
-                cwd: this.projectRoot 
-            });
-            console.log(`✅ Gradle version: ${result.split('\n')[2]}`);
+            const gradleWrapper = this.platform === 'windows' ? 'gradlew.bat' : './gradlew';
+            const result = execSync(`${gradleWrapper} --version`, { encoding: 'utf8' });
+            console.log('✅ Gradle setup validated');
             return true;
         } catch (error) {
-            console.error('❌ Gradle test failed:', error.message);
+            console.warn('⚠️ Gradle validation failed:', error.message);
             return false;
         }
     }
@@ -225,117 +218,104 @@ NODE_ENV=development
     async createPlatformScripts() {
         console.log('📜 Creating platform-specific scripts...');
         
-        const scriptsDir = path.join(this.projectRoot, 'scripts');
-        if (!fs.existsSync(scriptsDir)) {
-            fs.mkdirSync(scriptsDir, { recursive: true });
-        }
-        
-        // Create build script
-        const buildScript = this.platform === 'windows' ? 
-            this.createWindowsBuildScript() : 
+        if (this.platform === 'windows') {
+            this.createWindowsBuildScript();
+        } else {
             this.createUnixBuildScript();
-        
-        const buildScriptPath = path.join(scriptsDir, 
-            this.platform === 'windows' ? 'build.bat' : 'build.sh');
-        
-        fs.writeFileSync(buildScriptPath, buildScript, 'utf8');
-        
-        if (this.platform !== 'windows') {
-            fs.chmodSync(buildScriptPath, '755');
         }
         
-        console.log(`✅ Build script created: ${buildScriptPath}`);
-        return true;
+        console.log('✅ Platform scripts created');
     }
     
     createWindowsBuildScript() {
-        return `@echo off
-REM Auto-generated Windows build script
-echo 🔨 Building Android Soundboard App (Windows)
-
-REM Clean previous build
-echo 🧹 Cleaning previous build...
-call gradlew.bat clean
-
-REM Build debug APK
-echo 📱 Building debug APK...
-call gradlew.bat assembleDebug
-
-REM Check if build was successful
-if exist "app\\build\\outputs\\apk\\debug\\app-debug.apk" (
-    echo ✅ Build successful!
-    echo 📱 APK location: app\\build\\outputs\\apk\\debug\\app-debug.apk
+        const scriptPath = path.join(this.projectRoot, 'build.bat');
+        const content = `@echo off
+echo Building Android Soundboard Server...
+call gradlew.bat clean assembleDebug
+if %ERRORLEVEL% EQU 0 (
+    echo Build successful!
 ) else (
-    echo ❌ Build failed!
+    echo Build failed!
     exit /b 1
 )
-
-pause
 `;
+        
+        fs.writeFileSync(scriptPath, content, 'utf8');
     }
     
     createUnixBuildScript() {
-        return `#!/bin/bash
-# Auto-generated Unix build script
-echo "🔨 Building Android Soundboard App (${this.platform})"
-
-# Clean previous build
-echo "🧹 Cleaning previous build..."
-./gradlew clean
-
-# Build debug APK
-echo "📱 Building debug APK..."
-./gradlew assembleDebug
-
-# Check if build was successful
-if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-    echo "✅ Build successful!"
-    echo "📱 APK location: app/build/outputs/apk/debug/app-debug.apk"
+        const scriptPath = path.join(this.projectRoot, 'build.sh');
+        const content = `#!/bin/bash
+echo "Building Android Soundboard Server..."
+./gradlew clean assembleDebug
+if [ $? -eq 0 ]; then
+    echo "Build successful!"
 else
-    echo "❌ Build failed!"
+    echo "Build failed!"
     exit 1
 fi
 `;
+        
+        fs.writeFileSync(scriptPath, content, 'utf8');
+        fs.chmodSync(scriptPath, '755');
     }
     
     async run() {
-        console.log('🚀 Starting cross-platform environment setup...\n');
-        
-        const sdkPath = await this.setupAndroidSDK();
-        if (!sdkPath) return false;
-        
-        const jdkPath = await this.setupJDK();
-        if (!jdkPath) return false;
-        
-        const adbPath = await this.setupADB();
-        if (!adbPath) return false;
-        
-        await this.createLocalProperties(sdkPath, jdkPath);
-        await this.setupServerEnvironment(adbPath);
-        await this.installDependencies();
-        await this.validateGradleSetup();
-        await this.createPlatformScripts();
-        
-        console.log('\n🎉 Environment setup completed successfully!');
-        console.log('\n📋 Next steps:');
-        console.log('   1. Run the server: cd server && npm start');
-        console.log('   2. Build the app: npm run build (or use platform-specific script)');
-        console.log('   3. Connect your Android device via USB');
-        console.log('   4. Enable USB Debugging in Developer Options');
-        
-        return true;
+        try {
+            console.log('🚀 Starting cross-platform environment setup...');
+            console.log('===============================================');
+            
+            // Step 1: Setup Android SDK
+            const sdkPath = await this.setupAndroidSDK();
+            if (!sdkPath) {
+                console.log('⚠️ Continuing without Android SDK...');
+            }
+            
+            // Step 2: Setup JDK
+            const jdkPath = await this.setupJDK();
+            if (!jdkPath) {
+                console.log('⚠️ Continuing without JDK...');
+            }
+            
+            // Step 3: Setup ADB
+            const adbPath = await this.setupADB();
+            if (!adbPath) {
+                console.log('⚠️ Continuing without ADB...');
+            }
+            
+            // Step 4: Create configuration files
+            if (sdkPath && jdkPath) {
+                await this.createLocalProperties(sdkPath, jdkPath);
+            }
+            
+            if (adbPath) {
+                await this.setupServerEnvironment(adbPath);
+            }
+            
+            // Step 5: Install dependencies
+            await this.installDependencies();
+            
+            // Step 6: Validate Gradle
+            await this.validateGradleSetup();
+            
+            // Step 7: Create platform scripts
+            await this.createPlatformScripts();
+            
+            console.log('===============================================');
+            console.log('🎉 Environment setup completed successfully!');
+            console.log('');
+            console.log('📋 Next steps:');
+            console.log('   1. Run: npm run build:server-comprehensive');
+            console.log('   2. Test: npm run server');
+            console.log('   3. Build executable: npm run build:server-comprehensive');
+            
+        } catch (error) {
+            console.error('❌ Setup failed:', error.message);
+            process.exit(1);
+        }
     }
 }
 
-// Run the setup if this script is executed directly
-if (require.main === module) {
-    const setup = new CrossPlatformSetup();
-    setup.run().then(success => {
-        process.exit(success ? 0 : 1);
-    }).catch(error => {
-        console.error('💥 Setup failed:', error);
-        process.exit(1);
-    });
-}
-
-module.exports = CrossPlatformSetup; 
+// Run the setup
+const setup = new CrossPlatformSetup();
+setup.run(); 

@@ -1,3 +1,11 @@
+# Project Brief
+
+## 🚦 Project Rule: MCP-Driven Decision Making
+
+All project decisions must reference and utilize the MCP server configuration files (`mcp_server.json` and `~/.cursor/mcp.json`) and the SequentialThinking MCP server. Every decision must be context-aware, traceable, and leverage structured reasoning via these protocols.
+
+---
+
 # Project Brief: Android Soundboard Application
 
 ## Core Requirements

@@ -1,3 +1,11 @@
+# Tech Context
+
+## 🚦 MCP-Driven Technical Reasoning
+
+All technology choices, dependencies, and database changes must be validated and reasoned through the MCP server config files and SequentialThinking MCP server. Document the MCP session or endpoint used for each major technical decision.
+
+---
+
 # Technical Context: Android Soundboard Application
 
 ## Technologies Used

@@ -1,18 +1,9 @@
+const { app } = require('electron');
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, shell, ipcMain } = require('electron');
-const path = require('path');
-const { spawn } = require('child_process');
-const fs = require('fs');
-const os = require('os');
+// This prevents Electron from re-initializing the app when a second instance is launched.
+if (require('electron-squirrel-startup')) {
+    app.quit();
+}
 
-// Import our tray application
-const SoundboardServerTray = require('./scripts/server-tray.js');
-
-// Override app.whenReady to prevent duplicate initialization
-const originalWhenReady = app.whenReady;
-app.whenReady = () => {
-    return originalWhenReady.call(app);
-};
-
-// Initialize the server tray
-new SoundboardServerTray();
+// Require and start our tray application logic.
+require('./scripts/tray-app.js');

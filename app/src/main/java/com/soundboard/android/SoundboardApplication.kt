@@ -1,7 +1,7 @@
-package com.audiodeck.connect
+package com.soundboard.android
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
-class AudioDeckApplication : Application() 
+class SoundboardApplication : Application() 

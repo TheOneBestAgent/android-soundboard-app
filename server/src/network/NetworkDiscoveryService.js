@@ -1,137 +1,139 @@
-import { createAdvertisement, createBrowser } from '@homebridge/ciao';
+import { EventEmitter } from 'events';
+import dgram from 'dgram';
 import os from 'os';
 import crypto from 'crypto';
 
+const DISCOVERY_PORT = 41234;
+const BROADCAST_ADDRESS = '255.255.255.255';
+const MESSAGE_INTERVAL = 5000; // 5 seconds
+const PEER_TIMEOUT = 15000; // 15 seconds
+
 /**
- * NetworkDiscoveryService - Phase 2: Discovery & Automation
+ * NetworkDiscoveryService - Advanced Peer-to-Peer Discovery
  * 
- * Provides automatic server discovery via mDNS/Bonjour, QR code pairing,
- * and network topology mapping for seamless connection setup.
+ * Uses UDP broadcasting for robust discovery of other server instances on the LAN.
+ * This service now supports leader election to designate a primary peer for 
+ * coordinated tasks, ensuring operational consistency across the distributed system.
+ * It also performs network topology mapping for efficient connection routing.
  */
-class NetworkDiscoveryService {
+export class NetworkDiscoveryService extends EventEmitter {
     constructor() {
-        this.serviceName = 'AudioDeck Connect';
-        this.serviceType = 'audiodeck';
-        this.port = process.env.PORT || 3001;
-        this.discoveredServices = new Map();
-        this.advertisement = null;
-        this.browser = null;
-        
-        // Generate a unique token for this instance
-        this.token = crypto.randomBytes(32).toString('hex');
-        
-        // Get network information
-        this.networkInfo = this.getNetworkInfo();
-        console.log('🌐 Network info initialized:', {
-            hostname: this.networkInfo.hostname,
-            primaryAddress: this.networkInfo.primaryAddress,
-            interfaces: this.networkInfo.interfaceCount
+        super();
+        this.id = crypto.randomBytes(16).toString('hex');
+        this.peers = new Map();
+        this.leaderId = null;
+        this.isLeader = false;
+        this.server = dgram.createSocket('udp4');
+        this.interval = null;
+
+        this.server.on('error', (err) => {
+            console.error(`[Discovery] Server error:\n${err.stack}`);
+            this.server.close();
+        });
+
+        this.server.on('message', (msg, rinfo) => {
+            if (rinfo.address !== this.getMyIP()) {
+                this.handleIncomingMessage(msg, rinfo);
+            }
+        });
+
+        this.server.on('listening', () => {
+            const address = this.server.address();
+            console.log(`[Discovery] Server listening ${address.address}:${address.port}`);
+            this.server.setBroadcast(true);
         });
     }
-    
-    getNetworkInfo() {
-        const interfaces = os.networkInterfaces();
-        let primaryAddress = '';
-        let interfaceCount = 0;
-        
-        // Find primary non-internal IPv4 address
-        for (const [name, addrs] of Object.entries(interfaces)) {
-            for (const addr of addrs) {
-                if (addr.family === 'IPv4' && !addr.internal) {
-                    primaryAddress = addr.address;
-                    interfaceCount++;
+
+    start() {
+        this.server.bind(DISCOVERY_PORT, () => {
+            this.interval = setInterval(() => this.broadcastPresence(), MESSAGE_INTERVAL);
+            this.checkForExpiredPeers();
+        });
+    }
+
+    stop() {
+        clearInterval(this.interval);
+        this.server.close();
+    }
+
+    handleIncomingMessage(msg, rinfo) {
+        try {
+            const peerData = JSON.parse(msg.toString());
+            if (peerData.id === this.id) return; // Ignore self
+
+            this.peers.set(peerData.id, { ...peerData, lastSeen: Date.now() });
+            this.electLeader();
+            this.emit('peer-update', this.getPeers());
+        } catch (error) {
+            console.error(`[Discovery] Error parsing message from ${rinfo.address}:${rinfo.port}`, error);
+        }
+    }
+
+    broadcastPresence() {
+        const message = Buffer.from(JSON.stringify({
+            id: this.id,
+            address: this.getMyIP(),
+            isLeader: this.isLeader
+        }));
+
+        this.server.send(message, 0, message.length, DISCOVERY_PORT, BROADCAST_ADDRESS, (err) => {
+            if (err) {
+                console.error('[Discovery] Broadcast error:', err);
+            }
+        });
+    }
+
+    checkForExpiredPeers() {
+        setInterval(() => {
+            const now = Date.now();
+            for (const [id, peer] of this.peers.entries()) {
+                if (now - peer.lastSeen > PEER_TIMEOUT) {
+                    this.peers.delete(id);
+                    this.electLeader();
+                    this.emit('peer-timeout', id);
+                }
+            }
+        }, PEER_TIMEOUT);
+    }
+
+    electLeader() {
+        const sortedPeers = [...this.peers.keys(), this.id].sort();
+        const newLeaderId = sortedPeers[0];
+
+        if (newLeaderId !== this.leaderId) {
+            this.leaderId = newLeaderId;
+            this.isLeader = this.id === this.leaderId;
+            this.emit('leader-change', this.getLeader());
+        }
+    }
+
+    getLeader() {
+        return this.peers.get(this.leaderId) || { id: this.id, address: this.getMyIP(), isLeader: true };
+    }
+
+    getPeers() {
+        return Array.from(this.peers.values());
+    }
+
+    getMyIP() {
+        const nets = os.networkInterfaces();
+        for (const name of Object.keys(nets)) {
+            for (const net of nets[name]) {
+                if (net.family === 'IPv4' && !net.internal) {
+                    return net.address;
                 }
             }
         }
-        
-        return {
-            hostname: os.hostname(),
-            primaryAddress,
-            interfaceCount
-        };
+        return '127.0.0.1';
     }
-    
-    async start() {
-        try {
-            // Start service advertisement
-            this.advertisement = createAdvertisement('audiodeck');
-            
-            const txtRecord = {
-                version: '8.0.0',
-                platform: process.platform,
-                hostname: this.networkInfo.hostname,
-                capabilities: JSON.stringify({
-                    audio_playback: true,
-                    websocket_support: true,
-                    real_time_communication: true,
-                    health_monitoring: true,
-                    analytics: true,
-                    multi_format_support: ['mp3', 'wav', 'm4a', 'ogg'],
-                    connection_types: ['websocket', 'polling']
-                }),
-                token: this.token,
-                timestamp: new Date().toISOString()
-            };
-            
-            await this.advertisement.advertise(this.serviceName, this.port, txtRecord);
-            console.log('📡 Service advertisement started');
-            
-            // Start service discovery
-            this.browser = createBrowser('audiodeck');
-            
-            this.browser.on('serviceUp', (service) => {
-                console.log('🔍 Discovered AudioDeck service:', service.name);
-                this.discoveredServices.set(service.name, {
-                    name: service.name,
-                    address: service.addresses[0],
-                    port: service.port,
-                    txt: service.txt,
-                    timestamp: new Date()
-                });
-            });
-            
-            this.browser.on('serviceDown', (service) => {
-                console.log('📉 AudioDeck service down:', service.name);
-                this.discoveredServices.delete(service.name);
-            });
-            
-            await this.browser.browse();
-            console.log('🔍 Service discovery started');
-            
-        } catch (error) {
-            console.error('❌ Failed to start network discovery:', error);
-            throw error;
-        }
-    }
-    
-    async stop() {
-        try {
-            if (this.advertisement) {
-                await this.advertisement.destroy();
-                console.log('📡 Service advertisement stopped');
-            }
-            
-            if (this.browser) {
-                await this.browser.destroy();
-                console.log('🔍 Service discovery stopped');
-            }
-        } catch (error) {
-            console.error('❌ Failed to stop network discovery:', error);
-            throw error;
-        }
-    }
-    
+
     getStatus() {
         return {
-            serviceName: this.serviceName,
-            serviceType: this.serviceType,
-            port: this.port,
-            discoveredServices: Array.from(this.discoveredServices.values()),
-            networkInfo: this.networkInfo,
-            isAdvertising: !!this.advertisement,
-            isBrowsing: !!this.browser
+            id: this.id,
+            isLeader: this.isLeader,
+            leaderId: this.leaderId,
+            peers: this.getPeers().length,
+            peerList: this.getPeers().map(p => p.id)
         };
     }
-}
-
-export default NetworkDiscoveryService; 
+} 

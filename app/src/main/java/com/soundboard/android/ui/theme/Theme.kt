@@ -1,4 +1,4 @@
-package com.audiodeck.connect.ui.theme
+package com.soundboard.android.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -15,15 +15,16 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.soundboard.android.ui.theme.*
 
 // Icon-inspired theme with dark blue backgrounds and neon pink accents
-private val AudioDeckDarkTheme = darkColorScheme(
+private val DarkColorScheme = darkColorScheme(
     primary = NeonPink,                    // Primary neon pink for buttons and accents
     onPrimary = TextPrimary,               // White text on primary elements
     primaryContainer = NeonPinkDark,     // Dark blue containers
     onPrimaryContainer = TextPrimary,     // Light pink text in containers
     
-    secondary = Coral,               // Coral for secondary elements
+    secondary = CoralAccent,               // Coral for secondary elements
     onSecondary = TextPrimary,             // White text on secondary
     secondaryContainer = CoralDark,     // Button surface color
     onSecondaryContainer = TextPrimary,      // Light coral text
@@ -51,7 +52,7 @@ private val AudioDeckDarkTheme = darkColorScheme(
 )
 
 // Light theme for compatibility (though app focuses on dark theme)
-private val AudioDeckLightTheme = lightColorScheme(
+private val LightColorScheme = lightColorScheme(
     primary = NeonPinkDark,
     onPrimary = TextPrimary,
     primaryContainer = NeonPinkLight,
@@ -74,7 +75,7 @@ private val AudioDeckLightTheme = lightColorScheme(
 )
 
 @Composable
-fun AudioDeckConnectTheme(
+fun AndroidSoundboardTheme(
     darkTheme: Boolean = true, // Default to dark theme for audio deck aesthetic
     // Disable dynamic color to maintain consistent branding
     dynamicColor: Boolean = false,
@@ -85,8 +86,8 @@ fun AudioDeckConnectTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> AudioDeckDarkTheme
-        else -> AudioDeckLightTheme
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
     }
     
     val view = LocalView.current

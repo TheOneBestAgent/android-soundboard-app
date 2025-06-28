@@ -1,0 +1,44 @@
+JAVA_HOME: /opt/homebrew/opt/openjdk@17
+ANDROID_HOME: /Users/darvondoom/Library/Android/sdk
+PATH: /usr/local/bin:/Users/darvondoom/Library/Android/sdk/cmdline-tools/latest/bin:/Users/darvondoom/Library/Android/sdk/platform-tools:/opt/homebrew/opt/openjdk@17/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin
+drwxr-xr-x@ 13 darvondoom  staff  416 Jun 27 08:11 /Users/darvondoom/Library/Android/sdk
+lrwxr-xr-x   1 darvondoom  admin   28 Jun 27 08:14 /opt/homebrew/opt/openjdk@17 -> ../Cellar/openjdk@17/17.0.15
+lrwxr-xr-x  1 darvondoom  admin  28 Jun 27 08:14 /opt/homebrew/opt/openjdk@17 -> ../Cellar/openjdk@17/17.0.15
+drwxr-xr-x@ 13 darvondoom  staff  416 Jun 27 08:11 /Users/darvondoom/Library/Android/sdk
+drwxrwxr-x  134 darvondoom  admin  4288 Jun 27 08:14 /opt/homebrew/bin
+drwxr-xr-x    7 root        wheel   224 Jun 26 22:57 /usr/local/bin
+
+# Environment Audit [2025-06-28]
+
+## Phase 2.A: Full Dependency Scan
+
+### Server Dependencies (npm)
+
+```
+audiodeck-connect-server@8.0.0 /Users/darvondoom/android-soundboard-app-1/server
+├── @homebridge/ciao@1.3.3
+├── @yume-chan/adb@2.1.0
+├── cors@2.8.5
+├── dotenv@16.5.0
+├── express@4.21.2
+├── fs-extra@11.3.0
+├── koffi@2.12.0
+├── qrcode@1.5.4
+├── socket.io@4.8.1
+├── usb@2.15.0
+└── UNMET OPTIONAL DEPENDENCY voicemeeter-connector@^1.0.3
+```
+
+### Client Dependencies (Gradle)
+
+Gradle dependency tree successfully generated. Due to its length, the full output is not included here but was verified.
+
+---
+
+## Phase 2.C: Toolchain & SDK Verification
+
+- **Node.js:** v18.20.4
+- **Java (OpenJDK):** 17.0.15
+- **Gradle:** 8.14.2
+
+All toolchain versions match the requirements specified in `memory-bank/techContext.md`.

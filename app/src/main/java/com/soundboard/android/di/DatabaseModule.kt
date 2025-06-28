@@ -1,11 +1,11 @@
-package com.audiodeck.connect.di
+package com.soundboard.android.di
 
 import android.content.Context
 import androidx.room.Room
-import com.audiodeck.connect.data.dao.ConnectionHistoryDao
-import com.audiodeck.connect.data.dao.SoundButtonDao
-import com.audiodeck.connect.data.dao.AudioDeckLayoutDao
-import com.audiodeck.connect.data.database.AudioDeckDatabase
+import com.soundboard.android.data.dao.ConnectionHistoryDao
+import com.soundboard.android.data.dao.SoundButtonDao
+import com.soundboard.android.data.dao.SoundboardLayoutDao
+import com.soundboard.android.data.database.SoundboardDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,28 +19,28 @@ object DatabaseModule {
     
     @Provides
     @Singleton
-    fun provideAudioDeckDatabase(@ApplicationContext context: Context): AudioDeckDatabase {
+    fun provideSoundboardDatabase(@ApplicationContext context: Context): SoundboardDatabase {
         return Room.databaseBuilder(
             context.applicationContext,
-            AudioDeckDatabase::class.java,
-            AudioDeckDatabase.DATABASE_NAME
+            SoundboardDatabase::class.java,
+            SoundboardDatabase.DATABASE_NAME
         )
-            .addMigrations(AudioDeckDatabase.MIGRATION_2_3)
+            .addMigrations(SoundboardDatabase.MIGRATION_2_3)
             .build()
     }
     
     @Provides
-    fun provideSoundButtonDao(database: AudioDeckDatabase): SoundButtonDao {
+    fun provideSoundButtonDao(database: SoundboardDatabase): SoundButtonDao {
         return database.soundButtonDao()
     }
     
     @Provides
-    fun provideAudioDeckLayoutDao(database: AudioDeckDatabase): AudioDeckLayoutDao {
-        return database.audioDeckLayoutDao()
+    fun provideSoundboardLayoutDao(database: SoundboardDatabase): SoundboardLayoutDao {
+        return database.soundboardLayoutDao()
     }
     
     @Provides
-    fun provideConnectionHistoryDao(database: AudioDeckDatabase): ConnectionHistoryDao {
+    fun provideConnectionHistoryDao(database: SoundboardDatabase): ConnectionHistoryDao {
         return database.connectionHistoryDao()
     }
 } 

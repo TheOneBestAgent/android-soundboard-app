@@ -1,3 +1,11 @@
+# Product Context
+
+## 🚦 MCP-Driven Product Reasoning
+
+All product context, user experience goals, and requirements must be validated and reasoned through the MCP server config files and SequentialThinking MCP server. Document the MCP session or endpoint used for major product decisions.
+
+---
+
 # Product Context: Android Soundboard Application
 
 ## Why This Project Exists

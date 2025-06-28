@@ -1,4 +1,4 @@
-package com.audiodeck.connect.service
+package com.soundboard.android.service
 
 import android.content.Context
 import android.content.Intent
@@ -20,7 +20,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
-import javax.inject.ApplicationContext
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 @Singleton
 class GoogleDriveService @Inject constructor(
@@ -30,7 +30,7 @@ class GoogleDriveService @Inject constructor(
     private var googleSignInClient: GoogleSignInClient? = null
     
     companion object {
-        private const val AUDIODECK_FOLDER_NAME = "AudioDeck Connect Backups"
+        private const val SOUNDBOARD_FOLDER_NAME = "Soundboard Backups"
         private const val MIME_TYPE_ZIP = "application/zip"
     }
     
@@ -101,7 +101,7 @@ class GoogleDriveService @Inject constructor(
                 val drive = driveService ?: throw IllegalStateException("Not signed in to Google Drive")
                 
                 // Create or get the Soundboard folder
-                val folderId = getOrCreateAudioDeckFolder(drive)
+                val folderId = getOrCreateSoundboardFolder(drive)
                 
                 // Create file metadata
                 val fileMetadata = File().apply {
@@ -149,17 +149,17 @@ class GoogleDriveService @Inject constructor(
             try {
                 val drive = driveService ?: throw IllegalStateException("Not signed in to Google Drive")
                 
-                val folderId = getOrCreateAudioDeckFolder(drive)
+                val folderId = getOrCreateSoundboardFolder(drive)
                 
                 val result = drive.files().list()
-                    .setQ("parents in '$folderId' and name contains '$AUDIODECK_FOLDER_NAME'")
+                    .setQ("parents in '$folderId' and name contains '$SOUNDBOARD_FOLDER_NAME'")
                     .setFields("files(id, name, createdTime, size)")
                     .execute()
                 
                 result.files?.map { file ->
                     BackupFile(
                         id = file.id,
-                        name = file.name.removePrefix(AUDIODECK_FOLDER_NAME).removeSuffix(".json"),
+                        name = file.name.removePrefix(SOUNDBOARD_FOLDER_NAME).removeSuffix(".json"),
                         createdTime = file.createdTime?.value ?: 0L,
                         size = file.getSize() ?: 0L
                     )
@@ -184,10 +184,10 @@ class GoogleDriveService @Inject constructor(
         }
     }
     
-    private fun getOrCreateAudioDeckFolder(drive: Drive): String {
+    private fun getOrCreateSoundboardFolder(drive: Drive): String {
         // Check if folder exists
         val result = drive.files().list()
-            .setQ("name='$AUDIODECK_FOLDER_NAME' and mimeType='application/vnd.google-apps.folder'")
+            .setQ("name='$SOUNDBOARD_FOLDER_NAME' and mimeType='application/vnd.google-apps.folder'")
             .setFields("files(id)")
             .execute()
         
@@ -196,7 +196,7 @@ class GoogleDriveService @Inject constructor(
         } else {
             // Create folder
             val folderMetadata = File().apply {
-                name = AUDIODECK_FOLDER_NAME
+                name = SOUNDBOARD_FOLDER_NAME
                 mimeType = "application/vnd.google-apps.folder"
             }
             

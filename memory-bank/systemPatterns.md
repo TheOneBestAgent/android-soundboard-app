@@ -1,3 +1,15 @@
+# System Patterns
+
+## 🚦 Project Rule: MCP-Driven Decision Making
+
+**Rule:** All major decisions (design, implementation, architecture, troubleshooting, optimization, etc.) must reference and utilize the MCP server configuration files (`mcp_server.json` and `~/.cursor/mcp.json`) and the SequentialThinking MCP server. Every decision must:
+- Leverage the reasoning and context provided by the SequentialThinking MCP server.
+- Ensure all context, memory, and protocol endpoints in `mcp_server.json` and `~/.cursor/mcp.json` are considered.
+- Document the reasoning process and reference the relevant MCP endpoints or session in the decision log.
+- This guarantees every decision is context-aware, traceable, and benefits from structured, protocol-driven reasoning.
+
+---
+
 # System Patterns: Android Soundboard Application
 
 ## Overall Architecture

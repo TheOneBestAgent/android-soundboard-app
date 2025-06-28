@@ -1,0 +1,37 @@
+{
+    "mcpServers": {
+      "memoryManager": {
+        "endpoint": "http://107.172.90.189:8000/memory",
+        "methods": ["GET", "POST", "DELETE"]
+      },
+      "vectorStore": {
+        "endpoint": "http://107.172.90.189:8000/vector",
+        "methods": ["GET", "POST"]
+      },
+      "knowledgeGraph": {
+        "endpoint": "http://107.172.90.189:8000/graph",
+        "methods": ["GET", "POST"]
+      },
+      "documentStore": {
+        "endpoint": "http://107.172.90.189:8000/document",
+        "methods": ["GET", "POST"]
+      },
+      "contextWindow": {
+        "endpoint": "http://107.172.90.189:8000/context",
+        "methods": ["GET", "POST"]
+      },
+      "promptMemory": {
+        "endpoint": "http://107.172.90.189:8000/prompt",
+        "methods": ["GET", "POST"]
+      },
+      "stateMachine": {
+        "endpoint": "http://107.172.90.189:8000/state",
+        "methods": ["GET", "POST"]
+      },
+      "sessionHistory": {
+        "endpoint": "http://107.172.90.189:8000/session",
+        "methods": ["GET", "POST"]
+      }
+    }
+  }
+  

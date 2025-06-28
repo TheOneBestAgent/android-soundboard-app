@@ -2,8 +2,8 @@
   "name": "audiodeck-connect-server",
   "version": "8.0.0",
   "description": "Enterprise-grade server component for AudioDeck Connect - Professional audio control platform",
-  "main": "dist/index.js",
   "type": "module",
+  "main": "main.js",
   "scripts": {
     "setup": "node scripts/setup-environment.js",
     "build": "npm run setup && npm run build:android",
@@ -24,7 +24,14 @@
     "install:all": "npm install && npm run install:server",
     "clean": "node -e \"const os=require('os'); const {execSync}=require('child_process'); const wrapper = os.platform()==='win32'?'gradlew.bat':'./gradlew'; execSync(wrapper + ' clean', {stdio:'inherit'});\"",
     "validate": "npm run setup && npm run build && echo 'Build validation successful!'",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server/src/server.js",
+    "dev": "nodemon server/src/server.js",
+    "build:server": "node server/build.cjs",
+    "build:server:esbuild": "node scripts/build-server-esbuild.cjs",
+    "package:server": "npm run build:server:esbuild && cd server && pkg .",
+    "start:tray": "electron .",
+    "build:tray": "electron-builder"
   },
   "keywords": [
     "android",
@@ -36,46 +43,29 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "node-fetch": "^3.3.2",
+    "electron-squirrel-startup": "^1.0.1",
+    "node-fetch": "^2.6.7",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
-    "pkg": "^5.8.1",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
+    "electron": "^31.0.1",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.25.5",
+    "pkg": "^5.8.1"
   },
   "homepage": "./",
   "build": {
-    "appId": "com.soundboard.server-tray",
+    "appId": "com.soundboard.trayapp",
     "productName": "Soundboard Server",
-    "directories": {
-      "output": "dist"
-    },
     "files": [
       "main.js",
-      "scripts/server-tray.js",
-      "server/**/*",
-      "node_modules/**/*"
+      "scripts/tray-app.js",
+      "server/src-consolidated.js"
     ],
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Soundboard Server"
-    },
     "mac": {
       "target": "dmg",
       "icon": "assets/icon.icns"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "assets/icon.png"
     }
   }
 }
