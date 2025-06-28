@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AudioDeck Connect Server</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f7;
+            color: #1d1d1f;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1d1d1f;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .status.running {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .info h3 {
+            margin-top: 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #86868b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AudioDeck Connect Server</h1>
+        
+        <div class="status running">
+            <h2>Server Status: Running</h2>
+            <p>The server is running and ready to accept connections</p>
+        </div>
+
+        <div class="info">
+            <h3>Server Information</h3>
+            <p><strong>Version:</strong> 8.0.0</p>
+            <p><strong>Environment:</strong> Production</p>
+            <p><strong>Platform:</strong> macOS</p>
+        </div>
+
+        <div class="info">
+            <h3>Available Features</h3>
+            <ul>
+                <li>Real-time audio control and playback</li>
+                <li>Cross-platform compatibility</li>
+                <li>Multiple connection methods (WebSocket, USB/ADB, mDNS)</li>
+                <li>Enterprise-grade monitoring</li>
+                <li>Health monitoring and diagnostics</li>
+                <li>Real-time analytics</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>AudioDeck Connect © 2024</p>
+        </div>
+    </div>
+</body>
+</html> 

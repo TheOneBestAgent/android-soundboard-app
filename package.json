@@ -43,9 +43,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.1",
-    "node-fetch": "^2.6.7",
-    "socket.io-client": "^4.8.1"
+    "electron-squirrel-startup": "^1.0.1"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

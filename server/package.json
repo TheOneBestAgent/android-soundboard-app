@@ -17,18 +17,17 @@
     "@yume-chan/adb": "^2.1.0",
     "@yume-chan/adb-server-node-tcp": "^2.1.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "fs-extra": "^11.3.0",
-    "socket.io": "^4.7.5"
+    "node-fetch": "^2.7.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
   },
   "optionalDependencies": {
-    "voicemeeter-connector": "^2.0.1"
+    "voicemeeter-connector": "^2.1.4"
   },
   "devDependencies": {
-    "@babel/cli": "^7.27.2",
-    "@babel/core": "^7.27.7",
-    "@babel/preset-env": "^7.27.2",
     "esbuild": "^0.25.5",
     "pkg": "^5.8.1"
   },

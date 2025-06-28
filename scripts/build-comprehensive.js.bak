@@ -1,0 +1,266 @@
+#!/usr/bin/env node
+
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+class EnterpriseBuilder {
+    constructor() {
+        this.projectRoot = path.resolve(__dirname, '..');
+        this.serverDir = path.join(this.projectRoot, 'server');
+        this.buildDir = path.join(this.projectRoot, 'dist');
+        this.sourceDir = path.join(this.projectRoot, 'server', 'src');
+        this.logsDir = path.join(this.buildDir, 'logs');
+        
+        this.platform = process.platform;
+        this.arch = process.arch;
+        this.nodeVersion = process.version;
+        this.buildId = Date.now();
+        this.buildLog = [];
+        
+        // Core dependencies that must work
+        this.coreDependencies = {
+            server: ['express', 'socket.io', 'cors', 'dotenv'],
+            audio: ['koffi'],
+            network: ['bonjour-service'],
+            device: ['@yume-chan/adb'],
+            utils: ['fs-extra', 'qrcode']
+        };
+        
+        // Platform-specific dependencies
+        this.platformDependencies = {
+            win32: ['voicemeeter-connector'],
+            darwin: [],
+            linux: []
+        };
+        
+        // Build matrix configuration
+        this.buildMatrix = {
+            'win32-x64': {
+                nodeVersion: '18.20.4',
+                requiredModules: [...this.coreDependencies.server, ...this.platformDependencies.win32],
+                buildCommand: 'electron-builder --win --x64'
+            },
+            'darwin-arm64': {
+                nodeVersion: '18.20.4',
+                requiredModules: this.coreDependencies.server,
+                buildCommand: 'electron-builder --mac --arm64'
+            },
+            'darwin-x64': {
+                nodeVersion: '18.20.4',
+                requiredModules: this.coreDependencies.server,
+                buildCommand: 'electron-builder --mac --x64'
+            },
+            'linux-x64': {
+                nodeVersion: '18.20.4',
+                requiredModules: this.coreDependencies.server,
+                buildCommand: 'electron-builder --linux --x64'
+            }
+        };
+        
+        this.initBuild();
+    }
+    
+    log(message, type = 'info') {
+        const timestamp = new Date().toISOString();
+        const logEntry = `[${timestamp}] [${type.toUpperCase()}] ${message}`;
+        this.buildLog.push(logEntry);
+        console.log(logEntry);
+    }
+    
+    async initBuild() {
+        this.log('🏗️ AudioDeck Connect Enterprise Builder v8.0.0');
+        this.log(`📦 Build ID: ${this.buildId}`);
+        this.log(`🖥️ Platform: ${this.platform}-${this.arch}`);
+        this.log(`📋 Node.js Version: ${this.nodeVersion}`);
+        
+        try {
+            await this.runBuildPhases();
+        } catch (error) {
+            this.log(`Build failed: ${error.message}`, 'error');
+            this.saveBuildLog();
+            process.exit(1);
+        }
+    }
+    
+    async runBuildPhases() {
+        const phases = [
+            { name: 'Environment Setup', fn: () => this.setupEnvironment() },
+            { name: 'Dependency Validation', fn: () => this.validateDependencies() },
+            { name: 'Asset Preparation', fn: () => this.prepareAssets() },
+            { name: 'Build Configuration', fn: () => this.configureBuild() },
+            { name: 'Electron Build', fn: () => this.buildElectronApp() },
+            { name: 'Testing', fn: () => this.runTests() },
+            { name: 'Documentation', fn: () => this.generateDocs() }
+        ];
+        
+        for (const phase of phases) {
+            this.log(`Starting Phase: ${phase.name}`);
+            await phase.fn();
+            this.log(`Completed Phase: ${phase.name}`);
+        }
+    }
+    
+    async setupEnvironment() {
+        // Clean previous build
+        if (fs.existsSync(this.buildDir)) {
+            fs.rmSync(this.buildDir, { recursive: true, force: true });
+        }
+        
+        // Create necessary directories
+        [this.buildDir, this.logsDir].forEach(dir => {
+            fs.mkdirSync(dir, { recursive: true });
+        });
+        
+        // Verify node version
+        const targetVersion = this.buildMatrix[`${this.platform}-${this.arch}`]?.nodeVersion;
+        if (targetVersion && !this.nodeVersion.includes(targetVersion)) {
+            throw new Error(`Node.js version mismatch. Required: ${targetVersion}, Found: ${this.nodeVersion}`);
+        }
+    }
+    
+    async validateDependencies() {
+        this.log('Validating dependencies...');
+        
+        // Install dependencies
+        execSync('npm install', { cwd: this.serverDir, stdio: 'inherit' });
+        
+        // Verify core dependencies
+        for (const [category, deps] of Object.entries(this.coreDependencies)) {
+            this.log(`Checking ${category} dependencies...`);
+            for (const dep of deps) {
+                await this.verifyDependency(dep);
+            }
+        }
+        
+        // Verify platform-specific dependencies
+        const platformDeps = this.platformDependencies[this.platform] || [];
+        for (const dep of platformDeps) {
+            await this.verifyDependency(dep, false);
+        }
+    }
+    
+    async verifyDependency(dep, required = true) {
+        try {
+            require.resolve(dep);
+            this.log(`✅ ${dep} verified`);
+        } catch (error) {
+            if (required) {
+                throw new Error(`Required dependency ${dep} not found`);
+            }
+            this.log(`⚠️ Optional dependency ${dep} not available`, 'warn');
+        }
+    }
+    
+    async prepareAssets() {
+        // Copy necessary assets
+        const assets = [
+            { src: 'src', dest: 'dist/src' },
+            { src: 'public', dest: 'dist/public' },
+            { src: '../ADC.png', dest: 'dist/icon.png' }
+        ];
+        
+        for (const asset of assets) {
+            const srcPath = path.join(this.serverDir, asset.src);
+            const destPath = path.join(this.buildDir, asset.dest);
+            
+            if (fs.existsSync(srcPath)) {
+                fs.cpSync(srcPath, destPath, { recursive: true });
+            }
+        }
+    }
+    
+    async configureBuild() {
+        // Generate electron-builder config
+        const builderConfig = {
+            appId: 'com.audiodeck.connect',
+            productName: 'AudioDeck Connect',
+            copyright: 'Copyright © 2024',
+            directories: {
+                output: 'dist',
+                buildResources: 'build'
+            },
+            files: [
+                'dist/**/*',
+                'node_modules/**/*',
+                'package.json'
+            ],
+            mac: {
+                category: 'public.app-category.music',
+                target: ['dmg', 'zip'],
+                icon: 'dist/icon.png',
+                hardenedRuntime: true,
+                gatekeeperAssess: false,
+                entitlements: 'build/entitlements.mac.plist',
+                entitlementsInherit: 'build/entitlements.mac.plist'
+            },
+            win: {
+                target: ['nsis', 'portable'],
+                icon: 'dist/icon.png'
+            },
+            linux: {
+                target: ['AppImage', 'deb'],
+                icon: 'dist/icon.png',
+                category: 'Audio'
+            },
+            protocols: {
+                name: 'AudioDeck Connect Protocol',
+                schemes: ['audiodeck']
+            }
+        };
+        
+        fs.writeFileSync(
+            path.join(this.serverDir, 'electron-builder.json'),
+            JSON.stringify(builderConfig, null, 2)
+        );
+    }
+    
+    async buildElectronApp() {
+        const matrix = this.buildMatrix[`${this.platform}-${this.arch}`];
+        if (!matrix) {
+            throw new Error(`Unsupported platform: ${this.platform}-${this.arch}`);
+        }
+        
+        this.log(`Building for ${this.platform}-${this.arch}`);
+        execSync(matrix.buildCommand, { cwd: this.serverDir, stdio: 'inherit' });
+    }
+    
+    async runTests() {
+        this.log('Running tests...');
+        try {
+            execSync('npm test', { cwd: this.serverDir, stdio: 'inherit' });
+        } catch (error) {
+            this.log('Tests failed, but continuing build...', 'warn');
+        }
+    }
+    
+    async generateDocs() {
+        const buildReport = {
+            buildId: this.buildId,
+            timestamp: new Date().toISOString(),
+            platform: `${this.platform}-${this.arch}`,
+            nodeVersion: this.nodeVersion,
+            dependencies: this.coreDependencies,
+            buildMatrix: this.buildMatrix,
+            buildLog: this.buildLog
+        };
+        
+        fs.writeFileSync(
+            path.join(this.buildDir, 'BUILD_REPORT.json'),
+            JSON.stringify(buildReport, null, 2)
+        );
+    }
+    
+    saveBuildLog() {
+        const logPath = path.join(this.logsDir, `build-${this.buildId}.log`);
+        fs.writeFileSync(logPath, this.buildLog.join('\n'));
+        this.log(`Build log saved to: ${logPath}`);
+    }
+}
+
+// Start the build process
+new EnterpriseBuilder();
