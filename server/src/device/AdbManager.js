@@ -4,6 +4,7 @@
 import { Adb, AdbServerClient } from '@yume-chan/adb';
 import { AdbServerNodeTcpConnector } from '@yume-chan/adb-server-node-tcp';
 import EventEmitter from 'events';
+import AsyncUtils from '../utils/AsyncUtils.js';
 
 export class AdbManager extends EventEmitter {
     constructor() {
@@ -35,8 +36,13 @@ export class AdbManager extends EventEmitter {
         } catch (error) {
             console.error('❌ Failed to initialize ADB Manager or connect to ADB server:', error);
             this.isInitialized = false;
-            // Optionally, retry connection after a delay
-            setTimeout(() => this.initialize(), 10000);
+            // Use async retry mechanism instead of setTimeout
+            AsyncUtils.retry(
+                async () => await this.initialize(),
+                { maxAttempts: 5, baseDelay: 10000, maxDelay: 60000 }
+            ).catch(retryError => {
+                console.error('❌ Failed to initialize ADB after retries:', retryError);
+            });
         }
     }
     
@@ -70,8 +76,13 @@ export class AdbManager extends EventEmitter {
             } catch (e) {
                 console.error('Device tracking failed:', e);
                 this.tracking = false;
-                // Optional: try to restart tracking
-                setTimeout(() => this.startTracking(), 5000);
+                // Use async retry mechanism for tracking restart
+                AsyncUtils.retry(
+                    async () => await this.startTracking(),
+                    { maxAttempts: 3, baseDelay: 5000, maxDelay: 30000 }
+                ).catch(retryError => {
+                    console.error('❌ Failed to restart device tracking after retries:', retryError);
+                });
             }
         })();
     }

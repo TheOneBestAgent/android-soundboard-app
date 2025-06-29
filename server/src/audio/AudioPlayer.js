@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs-extra';
 import os from 'os';
+import AsyncUtils from '../utils/AsyncUtils.js';
 
 export class AudioPlayer {
     constructor() {
@@ -81,206 +82,149 @@ export class AudioPlayer {
     }
     
     async playOnWindows(filePath, volume) {
-        return new Promise((resolve) => {
-            try {
-                // Use PowerShell with Windows Media Player COM object
-                const volumePercent = Math.round(volume * 100);
-                const psScript = `
-                    Add-Type -AssemblyName presentationCore
-                    $mediaPlayer = New-Object system.windows.media.mediaplayer
-                    $mediaPlayer.open('${filePath.replace(/'/g, "''")}')
-                    $mediaPlayer.Volume = ${volume}
-                    $mediaPlayer.Play()
-                    Start-Sleep -Seconds 1
-                `;
+        try {
+            // Use PowerShell with Windows Media Player COM object
+            const volumePercent = Math.round(volume * 100);
+            const psScript = `
+                Add-Type -AssemblyName presentationCore
+                $mediaPlayer = New-Object system.windows.media.mediaplayer
+                $mediaPlayer.open('${filePath.replace(/'/g, "''")}')
+                $mediaPlayer.Volume = ${volume}
+                $mediaPlayer.Play()
+                Start-Sleep -Seconds 1
+            `;
+            
+            // Use AsyncUtils for process execution with timeout
+            const result = await AsyncUtils.withTimeout(
+                async (signal) => {
+                    return await AsyncUtils.executeProcess('powershell', ['-Command', psScript], {
+                        windowsHide: true
+                    }, signal);
+                },
+                5000,
+                'Windows audio playback timeout'
+            );
+            
+            console.log(`Windows audio playback finished with code: ${result.code}`);
+            return result.code === 0;
                 
-                const process = spawn('powershell', ['-Command', psScript], {
-                    windowsHide: true
-                });
-                
-                process.on('close', (code) => {
-                    console.log(`Windows audio playback finished with code: ${code}`);
-                    resolve(code === 0);
-                });
-                
-                process.on('error', (error) => {
-                    console.error('Windows audio playback error:', error);
-                    resolve(false);
-                });
-                
-                // Don't wait for the process to finish (fire and forget)
-                setTimeout(() => resolve(true), 100);
-                
-            } catch (error) {
-                console.error('Windows playback error:', error);
-                resolve(false);
-            }
-        });
+        } catch (error) {
+            console.error('Windows playback error:', error);
+            return false;
+        }
     }
     
     async playOnMacOS(filePath, volume) {
-        return new Promise((resolve) => {
-            try {
-                console.log(`macOS: Playing ${filePath} with volume ${volume}`);
-                
-                // Use afplay command (built into macOS) with volume control
-                const afplayArgs = [filePath];
-                
-                // afplay supports volume control with -v flag (0.0 to 1.0)
-                if (volume !== 1.0) {
-                    afplayArgs.push('-v', volume.toString());
-                }
-                
-                // Add debug flag to get more information
-                afplayArgs.push('-d');
-                
-                console.log(`🔊 Running afplay with args: ${afplayArgs.join(' ')}`);
-                
-                const process = spawn('afplay', afplayArgs, {
-                    stdio: ['ignore', 'pipe', 'pipe']
-                });
-                
-                // Store the current playing process
-                this.currentPlaying = process;
-                
-                let hasResolved = false;
-                let audioOutput = '';
-                let errorOutput = '';
-                
-                process.stdout.on('data', (data) => {
-                    const output = data.toString();
-                    audioOutput += output;
-                    console.log(`🔊 afplay stdout: ${output.trim()}`);
-                });
-                
-                process.stderr.on('data', (data) => {
-                    const output = data.toString();
-                    errorOutput += output;
-                    console.error(`🔊 afplay stderr: ${output.trim()}`);
-                });
-                
-                process.on('close', (code, signal) => {
-                    console.log(`🔊 macOS audio playback finished with code: ${code}, signal: ${signal}`);
-                    if (audioOutput) console.log(`🔊 Audio output: ${audioOutput.trim()}`);
-                    if (errorOutput) console.log(`🔊 Error output: ${errorOutput.trim()}`);
-                    
-                    this.currentPlaying = null;
-                    if (!hasResolved) {
-                        hasResolved = true;
-                        resolve(code === 0);
-                    }
-                });
-                
-                process.on('error', (error) => {
-                    console.error(`🔊 macOS audio playback error: ${error.message}`);
-                    this.currentPlaying = null;
-                    if (!hasResolved) {
-                        hasResolved = true;
-                        resolve(false);
-                    }
-                });
-                
-                // Test if afplay is actually working by checking after a short delay
-                setTimeout(() => {
-                    if (!hasResolved && this.currentPlaying && !this.currentPlaying.killed) {
-                        console.log('🔊 afplay process started successfully');
-                    } else if (!hasResolved) {
-                        console.error('🔊 afplay failed to start properly');
-                        hasResolved = true;
-                        resolve(false);
-                    }
-                }, 100);
-                
-                // Also try alternative approach if afplay doesn't work
-                setTimeout(async () => {
-                    if (!hasResolved) {
-                        console.log('🔊 afplay taking too long, trying alternative approach...');
-                        try {
-                            // Try using osascript to play sound as backup
-                            const osascriptProcess = spawn('osascript', [
-                                '-e', 
-                                `do shell script "afplay '${filePath.replace(/'/g, "\\'")}' &"`
-                            ], { stdio: 'pipe' });
-                            
-                            osascriptProcess.on('close', (code) => {
-                                if (!hasResolved) {
-                                    console.log(`🔊 Alternative osascript approach finished with code: ${code}`);
-                                    hasResolved = true;
-                                    resolve(code === 0);
-                                }
-                            });
-                            
-                        } catch (altError) {
-                            console.error(`🔊 Alternative approach failed: ${altError.message}`);
-                            if (!hasResolved) {
-                                hasResolved = true;
-                                resolve(false);
-                            }
-                        }
-                    }
-                }, 2000);
-                
-            } catch (error) {
-                console.error('🔊 macOS playback error:', error);
-                resolve(false);
+        try {
+            console.log(`macOS: Playing ${filePath} with volume ${volume}`);
+            
+            // Use afplay command (built into macOS) with volume control
+            const afplayArgs = [filePath];
+            
+            // afplay supports volume control with -v flag (0.0 to 1.0)
+            if (volume !== 1.0) {
+                afplayArgs.push('-v', volume.toString());
             }
-        });
+            
+            // Add debug flag to get more information
+            afplayArgs.push('-d');
+            
+            console.log(`🔊 Running afplay with args: ${afplayArgs.join(' ')}`);
+            
+            // Try primary approach with timeout
+            try {
+                const result = await AsyncUtils.withTimeout(
+                    async (signal) => {
+                        const result = await AsyncUtils.executeProcess('afplay', afplayArgs, {
+                            stdio: ['ignore', 'pipe', 'pipe']
+                        }, signal);
+                        
+                        console.log(`🔊 macOS audio playback finished with code: ${result.code}`);
+                        if (result.stdout) console.log(`🔊 Audio output: ${result.stdout.trim()}`);
+                        if (result.stderr) console.log(`🔊 Error output: ${result.stderr.trim()}`);
+                        
+                        return result.code === 0;
+                    },
+                    3000,
+                    'afplay timeout'
+                );
+                
+                return result;
+                
+            } catch (primaryError) {
+                console.log('🔊 Primary afplay approach failed, trying alternative approach...');
+                
+                // Fallback to osascript approach
+                const result = await AsyncUtils.withTimeout(
+                    async (signal) => {
+                        return await AsyncUtils.executeProcess('osascript', [
+                            '-e', 
+                            `do shell script "afplay '${filePath.replace(/'/g, "\\'")}' &"`
+                        ], { stdio: 'pipe' }, signal);
+                    },
+                    5000,
+                    'osascript timeout'
+                );
+                
+                console.log(`🔊 Alternative osascript approach finished with code: ${result.code}`);
+                return result.code === 0;
+            }
+                
+        } catch (error) {
+            console.error('🔊 macOS playback error:', error);
+            return false;
+        }
     }
     
     async playOnLinux(filePath, volume) {
-        return new Promise((resolve) => {
-            try {
-                // Try different audio players in order of preference
-                const players = [
-                    { cmd: 'paplay', args: [filePath] }, // PulseAudio
-                    { cmd: 'aplay', args: [filePath] },  // ALSA
-                    { cmd: 'mpg123', args: [filePath] }, // For MP3s
-                    { cmd: 'play', args: [filePath] }    // SoX
-                ];
-                
-                this.tryLinuxPlayers(players, 0, volume, resolve);
-                
-            } catch (error) {
-                console.error('Linux playback error:', error);
-                resolve(false);
-            }
-        });
+        try {
+            // Try different audio players in order of preference
+            const players = [
+                { cmd: 'paplay', args: [filePath] }, // PulseAudio
+                { cmd: 'aplay', args: [filePath] },  // ALSA
+                { cmd: 'mpg123', args: [filePath] }, // For MP3s
+                { cmd: 'play', args: [filePath] }    // SoX
+            ];
+            
+            return await this.tryLinuxPlayersAsync(players, 0, volume);
+            
+        } catch (error) {
+            console.error('Linux playback error:', error);
+            return false;
+        }
     }
     
-    tryLinuxPlayers(players, index, volume, resolve) {
+    async tryLinuxPlayersAsync(players, index, volume) {
         if (index >= players.length) {
             console.error('No suitable audio player found on Linux');
-            resolve(false);
-            return;
+            return false;
         }
         
         const player = players[index];
-        const process = spawn(player.cmd, player.args, {
-            stdio: 'ignore'
-        });
         
-        process.on('close', (code) => {
-            if (code === 0) {
+        try {
+            const result = await AsyncUtils.withTimeout(
+                async (signal) => {
+                    return await AsyncUtils.executeProcess(player.cmd, player.args, {
+                        stdio: 'ignore'
+                    }, signal);
+                },
+                5000,
+                `${player.cmd} timeout`
+            );
+            
+            if (result.code === 0) {
                 console.log(`Linux audio playback successful with ${player.cmd}`);
-                resolve(true);
+                return true;
             } else {
-                console.log(`${player.cmd} failed, trying next player...`);
-                this.tryLinuxPlayers(players, index + 1, volume, resolve);
+                console.log(`${player.cmd} failed with code ${result.code}, trying next player...`);
+                return await this.tryLinuxPlayersAsync(players, index + 1, volume);
             }
-        });
-        
-        process.on('error', (error) => {
-            console.log(`${player.cmd} not available, trying next player...`);
-            this.tryLinuxPlayers(players, index + 1, volume, resolve);
-        });
-        
-        // Don't wait too long for each attempt
-        setTimeout(() => {
-            if (!process.killed) {
-                process.kill();
-                this.tryLinuxPlayers(players, index + 1, volume, resolve);
-            }
-        }, 5000);
+            
+        } catch (error) {
+            console.log(`${player.cmd} not available or failed: ${error.message}, trying next player...`);
+            return await this.tryLinuxPlayersAsync(players, index + 1, volume);
+        }
     }
     
     stopCurrentSound() {
@@ -309,24 +253,19 @@ export class AudioPlayer {
         try {
             if (this.platform === 'darwin') {
                 console.log('🔊 Testing macOS system beep...');
-                const beepProcess = spawn('osascript', ['-e', 'beep'], { stdio: 'pipe' });
                 
-                return new Promise((resolve) => {
-                    beepProcess.on('close', (code) => {
-                        console.log(`🔊 System beep test finished with code: ${code}`);
-                        resolve(code === 0);
-                    });
-                    
-                    beepProcess.on('error', (error) => {
-                        console.error(`🔊 System beep test failed: ${error.message}`);
-                        resolve(false);
-                    });
-                    
-                    setTimeout(() => {
-                        console.log('🔊 System beep test completed');
-                        resolve(true);
-                    }, 1000);
-                });
+                const result = await AsyncUtils.withTimeout(
+                    async (signal) => {
+                        return await AsyncUtils.executeProcess('osascript', ['-e', 'beep'], {
+                            stdio: 'pipe'
+                        }, signal);
+                    },
+                    2000,
+                    'System beep test timeout'
+                );
+                
+                console.log(`🔊 System beep test finished with code: ${result.code}`);
+                return result.code === 0;
             }
         } catch (error) {
             console.error('🔊 Audio test error:', error);

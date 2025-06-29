@@ -1,5 +1,5 @@
-const mdns = require('mdns');
-const os = require('os');
+import mdns from 'mdns';
+import os from 'os';
 
 function setupMDNS(port) {
     try {
@@ -85,7 +85,7 @@ function discoverSoundboardServices() {
     });
 }
 
-module.exports = {
+export {
     setupMDNS,
     discoverSoundboardServices
 }; 

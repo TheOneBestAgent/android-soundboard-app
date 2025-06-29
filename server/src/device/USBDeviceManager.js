@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
 import os from 'os';
+import AsyncUtils from '../utils/AsyncUtils.js';
 
 /**
  * USB Device Manager
@@ -11,7 +12,7 @@ export class USBDeviceManager extends EventEmitter {
         super();
         this.platform = process.platform;
         this.devices = new Map();
-        this.monitoringInterval = null;
+        this.monitoringScheduler = null;
         this.isInitialized = false;
         
         console.log(`🔌 USBDeviceManager initializing for platform: ${this.platform}`);
@@ -31,25 +32,31 @@ export class USBDeviceManager extends EventEmitter {
         }
     }
     
-    startMonitoring() {
-        if (this.monitoringInterval) {
+    async startMonitoring() {
+        if (this.monitoringScheduler && this.monitoringScheduler.isRunning()) {
             return; // Already monitoring
         }
         
         console.log('👀 Starting USB device monitoring...');
-        this.monitoringInterval = setInterval(() => {
-            this.scanDevices();
-        }, 3000);
         
-        // Initial scan
-        this.scanDevices();
+        // Create async scheduler for device monitoring
+        this.monitoringScheduler = AsyncUtils.createAsyncScheduler(
+            async () => await this.scanDevices(),
+            3000,
+            { immediate: true }
+        );
+        
+        // Start the monitoring scheduler
+        this.monitoringScheduler.start().catch(error => {
+            console.error('USB device monitoring failed:', error);
+        });
     }
     
     stopMonitoring() {
-        if (this.monitoringInterval) {
-            clearInterval(this.monitoringInterval);
-            this.monitoringInterval = null;
-            console.log('🛑 Stopped USB device monitoring');
+        if (this.monitoringScheduler) {
+            this.monitoringScheduler.stop();
+            this.monitoringScheduler = null;
+            console.log('🛑 USB device monitoring stopped');
         }
     }
     
@@ -99,81 +106,63 @@ export class USBDeviceManager extends EventEmitter {
     }
     
     async getWindowsDevices() {
-        return new Promise((resolve) => {
-            try {
-                const process = spawn('powershell', [
-                    '-Command',
-                    'Get-WmiObject -Class Win32_PnPEntity | Where-Object {$_.DeviceID -like "*USB*"} | Select-Object Name, DeviceID'
-                ], { windowsHide: true });
-                
-                let output = '';
-                process.stdout.on('data', (data) => {
-                    output += data.toString();
-                });
-                
-                process.on('close', () => {
-                    const devices = this.parseWindowsOutput(output);
-                    resolve(devices);
-                });
-                
-                process.on('error', () => {
-                    resolve([]);
-                });
-                
-            } catch (error) {
-                resolve([]);
-            }
-        });
+        try {
+            const result = await AsyncUtils.withTimeout(
+                async (signal) => {
+                    return await AsyncUtils.executeProcess('powershell', [
+                        '-Command',
+                        'Get-WmiObject -Class Win32_PnPEntity | Where-Object {$_.DeviceID -like "*USB*"} | Select-Object Name, DeviceID'
+                    ], { windowsHide: true }, signal);
+                },
+                10000,
+                'Windows USB device detection timeout'
+            );
+            
+            const devices = this.parseWindowsOutput(result.stdout);
+            return devices;
+            
+        } catch (error) {
+            console.error('Error getting Windows USB devices:', error);
+            return [];
+        }
     }
     
     async getMacOSDevices() {
-        return new Promise((resolve) => {
-            try {
-                const process = spawn('system_profiler', ['SPUSBDataType', '-json']);
-                
-                let output = '';
-                process.stdout.on('data', (data) => {
-                    output += data.toString();
-                });
-                
-                process.on('close', () => {
-                    const devices = this.parseMacOSOutput(output);
-                    resolve(devices);
-                });
-                
-                process.on('error', () => {
-                    resolve([]);
-                });
-                
-            } catch (error) {
-                resolve([]);
-            }
-        });
+        try {
+            const result = await AsyncUtils.withTimeout(
+                async (signal) => {
+                    return await AsyncUtils.executeProcess('system_profiler', ['SPUSBDataType', '-json'], {}, signal);
+                },
+                15000,
+                'macOS USB device detection timeout'
+            );
+            
+            const devices = this.parseMacOSOutput(result.stdout);
+            return devices;
+            
+        } catch (error) {
+            console.error('Error getting macOS USB devices:', error);
+            return [];
+        }
     }
     
     async getLinuxDevices() {
-        return new Promise((resolve) => {
-            try {
-                const process = spawn('lsusb');
-                
-                let output = '';
-                process.stdout.on('data', (data) => {
-                    output += data.toString();
-                });
-                
-                process.on('close', () => {
-                    const devices = this.parseLinuxOutput(output);
-                    resolve(devices);
-                });
-                
-                process.on('error', () => {
-                    resolve([]);
-                });
-                
-            } catch (error) {
-                resolve([]);
-            }
-        });
+        try {
+            const result = await AsyncUtils.withTimeout(
+                async (signal) => {
+                    return await AsyncUtils.executeProcess('lsusb', [], {}, signal);
+                },
+                10000,
+                'Linux USB device detection timeout'
+            );
+            
+            const devices = this.parseLinuxOutput(result.stdout);
+            return devices;
+            
+        } catch (error) {
+            console.error('Error getting Linux USB devices:', error);
+            return [];
+        }
     }
     
     parseWindowsOutput(output) {

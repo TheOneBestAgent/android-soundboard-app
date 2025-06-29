@@ -25,17 +25,37 @@ export class VoicemeeterManager extends EventEmitter {
             return;
         }
         
-        try {
-            console.log('🔌 Attempting to load Voicemeeter Connector...');
-            this.vm = require('voicemeeter-connector');
-            this.method = 'native';
-            console.log('✅ Voicemeeter Connector loaded successfully');
-        } catch (error) {
-            console.warn('⚠️ Voicemeeter connector module not available:', error);
-            console.log('🔄 Falling back to direct audio playback');
-            this.method = 'direct';
-        }
+        // Initialize with async loading
+        this.initializeVoicemeeter();
         this.emitStatus();
+    }
+
+    /**
+     * Asynchronously initializes Voicemeeter with proper ES module dynamic import.
+     * Implements graceful fallback for cross-platform compatibility.
+     */
+    async initializeVoicemeeter() {
+        try {
+            console.log('🔌 Attempting to dynamically load Voicemeeter Connector...');
+            
+            // Use dynamic import for native module with proper error handling
+            const voicemeeterModule = await import('voicemeeter-connector');
+            this.vm = voicemeeterModule.default || voicemeeterModule;
+            this.method = 'native';
+            this.isAvailable = true;
+            
+            console.log('✅ Voicemeeter Connector loaded successfully via dynamic import');
+            this.emitStatus();
+            
+        } catch (error) {
+            console.warn('⚠️ Voicemeeter connector module not available:', error.message);
+            console.log('🔄 Falling back to direct audio playback');
+            
+            this.vm = null;
+            this.method = 'direct';
+            this.isAvailable = false;
+            this.emitStatus();
+        }
     }
 
     /**
@@ -46,17 +66,43 @@ export class VoicemeeterManager extends EventEmitter {
             return { status: 'direct', message: 'Using direct audio playback (non-Windows platform)' };
         }
         
+        // Wait for initialization to complete if still in progress
+        if (this.method === undefined) {
+            console.log('⏳ Waiting for Voicemeeter initialization to complete...');
+            await this.waitForInitialization();
+        }
+        
         if (this.method === 'native' && this.vm) {
             try {
                 await this.vm.connect();
+                this.isConnected = true;
+                console.log('✅ Connected to Voicemeeter successfully');
+                this.emitStatus();
                 return { status: 'connected', message: 'Connected to Voicemeeter' };
             } catch (error) {
                 console.error('❌ Failed to connect to Voicemeeter:', error);
+                this.isConnected = false;
+                this.emitStatus();
                 return { status: 'error', message: error.message };
             }
         }
         
         return { status: 'direct', message: 'Using direct audio playback (Voicemeeter not available)' };
+    }
+
+    /**
+     * Waits for Voicemeeter initialization to complete.
+     */
+    async waitForInitialization(timeout = 5000) {
+        const startTime = Date.now();
+        while (this.method === undefined && (Date.now() - startTime) < timeout) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (this.method === undefined) {
+            console.warn('⚠️ Voicemeeter initialization timed out, falling back to direct mode');
+            this.method = 'direct';
+            this.isAvailable = false;
+        }
     }
     
     /**

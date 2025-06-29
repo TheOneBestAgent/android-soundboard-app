@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import dgram from 'dgram';
 import os from 'os';
 import crypto from 'crypto';
+import AsyncUtils from '../utils/AsyncUtils.js';
 
 const DISCOVERY_PORT = 41234;
 const BROADCAST_ADDRESS = '255.255.255.255';
@@ -24,7 +25,8 @@ export class NetworkDiscoveryService extends EventEmitter {
         this.leaderId = null;
         this.isLeader = false;
         this.server = dgram.createSocket('udp4');
-        this.interval = null;
+        this.broadcastScheduler = null;
+        this.cleanupScheduler = null;
 
         this.server.on('error', (err) => {
             console.error(`[Discovery] Server error:\n${err.stack}`);
@@ -44,16 +46,48 @@ export class NetworkDiscoveryService extends EventEmitter {
         });
     }
 
-    start() {
-        this.server.bind(DISCOVERY_PORT, () => {
-            this.interval = setInterval(() => this.broadcastPresence(), MESSAGE_INTERVAL);
-            this.checkForExpiredPeers();
+    async start() {
+        return new Promise((resolve, reject) => {
+            this.server.bind(DISCOVERY_PORT, async () => {
+                try {
+                    // Start broadcast scheduler
+                    this.broadcastScheduler = AsyncUtils.createAsyncScheduler(
+                        async () => await this.broadcastPresence(),
+                        MESSAGE_INTERVAL,
+                        { immediate: true }
+                    );
+                    
+                    // Start cleanup scheduler
+                    this.cleanupScheduler = AsyncUtils.createAsyncScheduler(
+                        async () => await this.checkForExpiredPeers(),
+                        PEER_TIMEOUT,
+                        { immediate: false }
+                    );
+                    
+                    // Start both schedulers
+                    this.broadcastScheduler.start().catch(console.error);
+                    this.cleanupScheduler.start().catch(console.error);
+                    
+                    resolve();
+                } catch (error) {
+                    reject(error);
+                }
+            });
         });
     }
 
-    stop() {
-        clearInterval(this.interval);
-        this.server.close();
+    async stop() {
+        if (this.broadcastScheduler) {
+            this.broadcastScheduler.stop();
+            this.broadcastScheduler = null;
+        }
+        
+        if (this.cleanupScheduler) {
+            this.cleanupScheduler.stop();
+            this.cleanupScheduler = null;
+        }
+        
+        return AsyncUtils.promisify(this.server.close, this.server)();
     }
 
     handleIncomingMessage(msg, rinfo) {
@@ -69,31 +103,33 @@ export class NetworkDiscoveryService extends EventEmitter {
         }
     }
 
-    broadcastPresence() {
+    async broadcastPresence() {
         const message = Buffer.from(JSON.stringify({
             id: this.id,
             address: this.getMyIP(),
             isLeader: this.isLeader
         }));
 
-        this.server.send(message, 0, message.length, DISCOVERY_PORT, BROADCAST_ADDRESS, (err) => {
-            if (err) {
-                console.error('[Discovery] Broadcast error:', err);
-            }
-        });
+        try {
+            await AsyncUtils.promisify(
+                (msg, offset, length, port, address, callback) => {
+                    this.server.send(msg, offset, length, port, address, callback);
+                }
+            )(message, 0, message.length, DISCOVERY_PORT, BROADCAST_ADDRESS);
+        } catch (error) {
+            console.error('[Discovery] Broadcast error:', error);
+        }
     }
 
-    checkForExpiredPeers() {
-        setInterval(() => {
-            const now = Date.now();
-            for (const [id, peer] of this.peers.entries()) {
-                if (now - peer.lastSeen > PEER_TIMEOUT) {
-                    this.peers.delete(id);
-                    this.electLeader();
-                    this.emit('peer-timeout', id);
-                }
+    async checkForExpiredPeers() {
+        const now = Date.now();
+        for (const [id, peer] of this.peers.entries()) {
+            if (now - peer.lastSeen > PEER_TIMEOUT) {
+                this.peers.delete(id);
+                this.electLeader();
+                this.emit('peer-timeout', id);
             }
-        }, PEER_TIMEOUT);
+        }
     }
 
     electLeader() {

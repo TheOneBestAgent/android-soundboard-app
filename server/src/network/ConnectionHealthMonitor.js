@@ -1,4 +1,4 @@
-const EventEmitter = require('events');
+import EventEmitter from 'events';
 
 class ConnectionHealthMonitor extends EventEmitter {
     constructor() {
@@ -450,4 +450,4 @@ class ConnectionHealthMonitor extends EventEmitter {
     }
 }
 
-module.exports = ConnectionHealthMonitor; 
+export default ConnectionHealthMonitor; 

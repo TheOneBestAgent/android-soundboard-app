@@ -1,4 +1,4 @@
-const EventEmitter = require('events');
+import EventEmitter from 'events';
 
 class SmartReconnectionManager extends EventEmitter {
     constructor() {
@@ -413,4 +413,4 @@ class SmartReconnectionManager extends EventEmitter {
     }
 }
 
-module.exports = SmartReconnectionManager; 
+export default SmartReconnectionManager; 

@@ -1,0 +1,104 @@
+{
+  "timestamp": "2025-06-29T00:38:15.729Z",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "nodeVersion": "v18.20.4",
+  "tests": [
+    {
+      "name": "Clean Build Test",
+      "status": "PASS",
+      "duration": 81898,
+      "result": {
+        "installTime": 12120,
+        "buildTime": 6355,
+        "executableSizeMB": 123,
+        "success": true
+      }
+    },
+    {
+      "name": "Native Module Validation",
+      "status": "PASS",
+      "duration": 131,
+      "result": {
+        "@yume-chan/adb": {
+          "status": "success",
+          "path": "/Users/Darius/Documents/GitHub/android-soundboard-app/server/node_modules/@yume-chan/adb",
+          "hasExports": true
+        },
+        "@yume-chan/adb-server-node-tcp": {
+          "status": "success",
+          "path": "/Users/Darius/Documents/GitHub/android-soundboard-app/server/node_modules/@yume-chan/adb-server-node-tcp",
+          "hasExports": true
+        },
+        "socket.io": {
+          "status": "success",
+          "path": "/Users/Darius/Documents/GitHub/android-soundboard-app/server/node_modules/socket.io",
+          "hasExports": true
+        },
+        "express": {
+          "status": "success",
+          "path": "/Users/Darius/Documents/GitHub/android-soundboard-app/server/node_modules/express",
+          "hasExports": true
+        },
+        "fs-extra": {
+          "status": "success",
+          "path": "/Users/Darius/Documents/GitHub/android-soundboard-app/server/node_modules/fs-extra",
+          "hasExports": true
+        },
+        "voicemeeter-connector": {
+          "status": "available",
+          "path": "/Users/Darius/Documents/GitHub/android-soundboard-app/server/node_modules/voicemeeter-connector"
+        }
+      }
+    },
+    {
+      "name": "Bundle Analysis",
+      "status": "PASS",
+      "duration": 1,
+      "result": {
+        "executable": {},
+        "bundle": {
+          "size": 1838000,
+          "sizeMB": 2,
+          "created": "2025-06-29T00:39:31.654Z"
+        },
+        "nativeModules": {
+          "count": 3,
+          "modules": [
+            "@yume-chan",
+            "koffi",
+            "voicemeeter-connector"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Performance Baseline",
+      "status": "FAIL",
+      "duration": 1425,
+      "error": "Server exited with code 1"
+    },
+    {
+      "name": "Error Recovery",
+      "status": "PASS",
+      "duration": 30182,
+      "result": {
+        "corruptedPackageJson": {
+          "status": "expected-failure",
+          "error": "Command failed: npm run build\nnpm error code EJSONPARSE\nnpm error JSON.parse Invalid package.json: JSONParseError: Unexpected token \"i\" (0x69) in JSON at position 2 while parsing \"{ invalid json }\"\nnpm error JSON.parse Failed to parse JSON data.\nnpm error JSON.parse Note: package.json must be actual JSON, not just JavaScript.\n\nnpm error A complete log of this run can be found in: /Users/Darius/.npm/_logs/2025-06-29T00_39_39_289Z-debug-0.log\n"
+        },
+        "missingDependencies": {
+          "status": "expected-failure",
+          "error": "spawnSync /bin/sh ETIMEDOUT"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "totalDuration": 113639,
+    "totalTests": 5,
+    "passedTests": 4,
+    "failedTests": 1,
+    "successRate": 80
+  }
+}
