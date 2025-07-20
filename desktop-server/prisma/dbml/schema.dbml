@@ -1,0 +1,48 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table users {
+  id String [pk]
+  username String [unique, not null]
+  email String [unique]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  soundButtons sound_buttons [not null]
+  soundboardGrids soundboard_grids [not null]
+}
+
+Table sound_buttons {
+  id String [pk]
+  userId String [not null]
+  name String [not null]
+  filePath String [not null]
+  duration Float
+  volume Float [not null, default: 1]
+  pitch Float [not null, default: 1]
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+}
+
+Table soundboard_grids {
+  id String [pk]
+  userId String [not null]
+  name String [not null]
+  layoutConfig String
+  createdAt DateTime [default: `now()`, not null]
+  user users [not null]
+}
+
+Table audio_files {
+  id String [pk]
+  filename String [not null]
+  filePath String [not null]
+  fileSize Int
+  duration Float
+  format String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Ref: sound_buttons.userId > users.id [delete: Cascade]
+
+Ref: soundboard_grids.userId > users.id [delete: Cascade]
